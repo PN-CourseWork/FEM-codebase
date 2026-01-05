@@ -1,6 +1,6 @@
 
 # Generated figures
-figures/
+#figures/*
 # Report 
 docs/reports/TexReport
 
