@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ana_p3"
 version = "0.1.0"
-description = "Package for project 3 in Advanced Numerical Algorithms Course"
+description = "Package for Finite Element Course"
 readme = "README.md"
 requires-python = "==3.12.*"
 license = { text = "MIT" }
@@ -16,11 +16,7 @@ authors = [
 # All dependencies (runtime, docs, and dev)
 dependencies = [
   # Runtime dependencies
-  "numpy>=1.24.0",
-  "matplotlib>=3.7.0",
-  "pandas>=2.0.0",
-  "scipy>=1.11.0",
-  "seaborn>=0.12.0",
+  "numpy>=2.4.0",
 ]
 
 [tool.setuptools]
