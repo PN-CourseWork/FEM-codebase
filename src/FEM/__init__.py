@@ -7,6 +7,6 @@ from .elements import (
     element_advection_diffusion,
     element_diffusion_reaction,
 )
-from .assembly import assemble_1d, assemble_1d_variable
+from .assembly import assemble_1d
 from .boundary import apply_dirichlet_bc, apply_dirichlet_bc_symmetric
 from .solvers import solve_symmetric, solve_general

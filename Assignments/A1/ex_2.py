@@ -31,8 +31,8 @@ def BVP1D(L, c, d, M):
     u : ndarray
         FEM solution at the nodes
     """
-    x, h = uniform_mesh(L, M)
-    A, b = assemble_1d(M, element_diffusion_reaction, h)
+    x, _ = uniform_mesh(L, M)
+    A, b = assemble_1d(x, element_diffusion_reaction)
     apply_dirichlet_bc(A, b, 0, c)
     apply_dirichlet_bc(A, b, M - 1, d)
     u = solve_symmetric(A, b)

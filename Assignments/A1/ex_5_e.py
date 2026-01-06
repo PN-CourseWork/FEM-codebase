@@ -24,11 +24,10 @@ def advection_diffusion_FEM(eps, psi, f, M):
     """
     Solve -eps*u'' + psi*u' = f on [0,1] with u(0) = u(1) = 0.
     """
-    x, h = uniform_mesh(1.0, M)
+    x, _ = uniform_mesh(1.0, M)
     A, b = assemble_1d(
-        M,
+        x,
         lambda h: element_advection_diffusion(h, eps, psi),
-        h,
         lambda h: f * element_load(h),
     )
     apply_dirichlet_bc(A, b, 0, 0.0)
