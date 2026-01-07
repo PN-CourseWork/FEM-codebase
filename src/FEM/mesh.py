@@ -1,24 +1,34 @@
+from dataclasses import dataclass
 import numpy as np
 
 
-def uniform_mesh(L: float, M: int) -> tuple[np.ndarray, float]:
+@dataclass
+class Mesh:
     """
-    Create a uniform 1D mesh on [0, L] with M nodes.
+    Finite element mesh.
 
-    Parameters
+    Attributes
     ----------
-    L : float
-        Domain length
-    M : int
-        Number of nodes
-
-    Returns
-    -------
-    x : ndarray
-        Node coordinates (length M)
-    h : float
-        Element size
+    VX : ndarray (n_nodes,)
+        Vertex coordinates
+    EToV : ndarray (n_elem, nodes_per_elem)
+        Element-to-vertex connectivity
     """
-    x = np.linspace(0.0, L, M)
-    h = L / (M - 1)
-    return x, h
+
+    VX: np.ndarray
+    EToV: np.ndarray
+
+    @property
+    def n_nodes(self) -> int:
+        return len(self.VX)
+
+    @property
+    def n_elem(self) -> int:
+        return len(self.EToV)
+
+
+def line_mesh(L: float, n_elem: int) -> Mesh:
+    """Create 1D mesh on [0, L]."""
+    VX = np.linspace(0, L, n_elem + 1)
+    EToV = np.column_stack([np.arange(n_elem), np.arange(1, n_elem + 1)])
+    return Mesh(VX, EToV)

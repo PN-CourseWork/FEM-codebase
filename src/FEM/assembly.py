@@ -1,46 +1,72 @@
 import numpy as np
-from typing import Callable
+from numba import njit
+from scipy.sparse import csr_matrix
 
 
-def assemble_1d(
-    x: np.ndarray,
-    element_matrix_fn: Callable[[float], np.ndarray],
-    element_load_fn: Callable[[float], np.ndarray] | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Assemble global stiffness matrix and load vector for 1D FEM.
+@njit
+def _build_csr_1d(Ke_all, n_nodes):
+    """Build CSR arrays directly for 1D tridiagonal FEM matrix."""
+    n_elem = len(Ke_all)
 
-    Parameters
-    ----------
-    x : ndarray
-        Node coordinates (supports both uniform and non-uniform meshes)
-    element_matrix_fn : callable
-        Function that takes element size h and returns 2x2 element matrix
-    element_load_fn : callable, optional
-        Function that takes element size h and returns length-2 element load vector
+    # Tridiagonal: 2 entries in first/last row, 3 in middle rows
+    nnz = 2 + 3 * (n_nodes - 2) + 2 if n_nodes > 2 else (2 * n_nodes - 1)
 
-    Returns
-    -------
-    A : ndarray (M, M)
-        Global stiffness matrix
-    b : ndarray (M,)
-        Global load vector
-    """
-    M = len(x)
-    A = np.zeros((M, M))
-    b = np.zeros(M)
+    data = np.zeros(nnz)
+    indices = np.empty(nnz, dtype=np.int64)
+    indptr = np.empty(n_nodes + 1, dtype=np.int64)
 
-    for i in range(M - 1):
-        h = x[i + 1] - x[i]
-        Ke = element_matrix_fn(h)
-        fe = element_load_fn(h) if element_load_fn else np.zeros(2)
+    # Build structure
+    idx = 0
+    for i in range(n_nodes):
+        indptr[i] = idx
+        if i > 0:
+            indices[idx] = i - 1
+            idx += 1
+        indices[idx] = i
+        idx += 1
+        if i < n_nodes - 1:
+            indices[idx] = i + 1
+            idx += 1
+    indptr[n_nodes] = idx
 
-        A[i, i] += Ke[0, 0]
-        A[i, i + 1] += Ke[0, 1]
-        A[i + 1, i] += Ke[1, 0]
-        A[i + 1, i + 1] += Ke[1, 1]
+    # Accumulate element contributions
+    for e in range(n_elem):
+        n1, n2 = e, e + 1
 
-        b[i] += fe[0]
-        b[i + 1] += fe[1]
+        # Row n1: entries at (n1, n1) and (n1, n2)
+        row_start = indptr[n1]
+        if n1 == 0:
+            data[row_start] += Ke_all[e, 0, 0]      # (n1, n1)
+            data[row_start + 1] += Ke_all[e, 0, 1]  # (n1, n2)
+        else:
+            data[row_start + 1] += Ke_all[e, 0, 0]  # (n1, n1) - middle entry
+            data[row_start + 2] += Ke_all[e, 0, 1]  # (n1, n2) - right entry
 
-    return A, b
+        # Row n2: entries at (n2, n1) and (n2, n2)
+        row_start = indptr[n2]
+        data[row_start] += Ke_all[e, 1, 0]          # (n2, n1) - left entry
+        if n2 == n_nodes - 1:
+            data[row_start + 1] += Ke_all[e, 1, 1]  # (n2, n2)
+        else:
+            data[row_start + 1] += Ke_all[e, 1, 1]  # (n2, n2) - middle entry
+
+    return data, indices, indptr
+
+
+def assemble_matrix_1d(Ke_all, n_nodes):
+    """Assemble 1D FEM matrix directly to CSR (optimal for tridiagonal)."""
+    data, indices, indptr = _build_csr_1d(Ke_all, n_nodes)
+    return csr_matrix((data, indices, indptr), shape=(n_nodes, n_nodes))
+
+
+@njit
+def assemble_vector(elements, fe_all, n_nodes):
+    """Assemble element load vectors into global vector."""
+    b = np.zeros(n_nodes)
+    n_elem, npe = fe_all.shape
+
+    for e in range(n_elem):
+        for i in range(npe):
+            b[elements[e, i]] += fe_all[e, i]
+
+    return b

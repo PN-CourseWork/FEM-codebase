@@ -1,121 +1,64 @@
 import numpy as np
+from numba import njit
 
 
-def element_diffusion(h: float, coeff: float = 1.0) -> np.ndarray:
+@njit
+def diffusion(h: float, coeff: float = 1.0) -> np.ndarray:
     """
-    Element stiffness matrix for diffusion term: -coeff * u''
+    Element stiffness matrix for diffusion: -coeff * u''
 
-    Weak form contribution: coeff * ∫ u' v' dx
-
-    Parameters
-    ----------
-    h : float
-        Element size
-    coeff : float
-        Diffusion coefficient (default 1.0)
-
-    Returns
-    -------
-    Ke : ndarray (2, 2)
-        Element stiffness matrix
+    Weak form: coeff * ∫ u' v' dx
     """
-    return coeff / h * np.array([[1, -1], [-1, 1]])
+    Ke = np.empty((2, 2))
+    c = coeff / h
+    Ke[0, 0] = c
+    Ke[0, 1] = -c
+    Ke[1, 0] = -c
+    Ke[1, 1] = c
+    return Ke
 
 
-def element_mass(h: float, coeff: float = 1.0) -> np.ndarray:
+@njit
+def mass(h: float, coeff: float = 1.0) -> np.ndarray:
     """
-    Element mass matrix for reaction term: coeff * u
+    Element mass matrix for reaction: coeff * u
 
-    Weak form contribution: coeff * ∫ u v dx
-
-    Parameters
-    ----------
-    h : float
-        Element size
-    coeff : float
-        Reaction coefficient (default 1.0)
-
-    Returns
-    -------
-    Me : ndarray (2, 2)
-        Element mass matrix
+    Weak form: coeff * ∫ u v dx
     """
-    return coeff * h / 6 * np.array([[2, 1], [1, 2]])
+    Ke = np.empty((2, 2))
+    c = coeff * h / 6.0
+    Ke[0, 0] = 2.0 * c
+    Ke[0, 1] = c
+    Ke[1, 0] = c
+    Ke[1, 1] = 2.0 * c
+    return Ke
 
 
-def element_advection(psi: float) -> np.ndarray:
+@njit
+def advection(h: float, psi: float) -> np.ndarray:
     """
-    Element matrix for advection term: psi * u'
+    Element matrix for advection: psi * u'
 
-    Weak form contribution: psi * ∫ u' v dx
-
-    Parameters
-    ----------
-    psi : float
-        Advection velocity
-
-    Returns
-    -------
-    Ce : ndarray (2, 2)
-        Element advection matrix
+    Weak form: psi * ∫ u' v dx
     """
-    return psi / 2 * np.array([[-1, 1], [-1, 1]])
+    Ke = np.empty((2, 2))
+    c = psi / 2.0
+    Ke[0, 0] = -c
+    Ke[0, 1] = c
+    Ke[1, 0] = -c
+    Ke[1, 1] = c
+    return Ke
 
 
-def element_load(h: float) -> np.ndarray:
+@njit
+def load(h: float, f: float = 1.0) -> np.ndarray:
     """
-    Element load vector for constant source f=1.
+    Element load vector for source term f.
 
-    Weak form contribution: ∫ f v dx = ∫ v dx
-
-    Parameters
-    ----------
-    h : float
-        Element size
-
-    Returns
-    -------
-    fe : ndarray (2,)
-        Element load vector
+    Weak form: f * ∫ v dx
     """
-    return h / 2 * np.array([1, 1])
-
-
-def element_advection_diffusion(h: float, eps: float, psi: float) -> np.ndarray:
-    """
-    Combined element matrix for advection-diffusion: -eps * u'' + psi * u'
-
-    Parameters
-    ----------
-    h : float
-        Element size
-    eps : float
-        Diffusion coefficient
-    psi : float
-        Advection velocity
-
-    Returns
-    -------
-    Ke : ndarray (2, 2)
-        Element matrix
-    """
-    return element_diffusion(h, eps) + element_advection(psi)
-
-
-def element_diffusion_reaction(h: float) -> np.ndarray:
-    """
-    Combined element matrix for diffusion-reaction: u'' - u = 0
-
-    Weak form: ∫ u' v' dx + ∫ u v dx = 0
-
-    Parameters
-    ----------
-    h : float
-        Element size
-
-    Returns
-    -------
-    Ke : ndarray (2, 2)
-        Element matrix
-    """
-    return element_diffusion(h) + element_mass(h)
+    fe = np.empty(2)
+    c = f * h / 2.0
+    fe[0] = c
+    fe[1] = c
+    return fe

@@ -1,12 +1,6 @@
-from .mesh import uniform_mesh
-from .elements import (
-    element_diffusion,
-    element_mass,
-    element_advection,
-    element_load,
-    element_advection_diffusion,
-    element_diffusion_reaction,
-)
-from .assembly import assemble_1d
-from .boundary import apply_dirichlet_bc, apply_dirichlet_bc_symmetric
-from .solvers import solve_symmetric, solve_general
+from .mesh import Mesh, line_mesh
+from .elements import diffusion, mass, advection, load
+from .assembly import assemble_matrix_1d, assemble_vector
+from .boundary import apply_dirichlet
+from .interpolation import interpolate, project, l2_norm, l2_norm_element, l2_error_element
+from .amr import refine, refinement_error, mark_elements
