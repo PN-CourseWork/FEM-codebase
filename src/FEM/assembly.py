@@ -5,6 +5,29 @@ from scipy.sparse import csr_matrix
 from .elements import advection
 from .datastructures import Mesh
 
+# Pre-computed Gauss quadrature points and weights (cached at module level)
+_GAUSS_QUAD = {
+    1: (np.array([0.0]), np.array([2.0])),
+    2: (np.array([-1.0 / np.sqrt(3), 1.0 / np.sqrt(3)]), np.array([1.0, 1.0])),
+    3: (np.array([-np.sqrt(3 / 5), 0.0, np.sqrt(3 / 5)]), np.array([5 / 9, 8 / 9, 5 / 9])),
+    5: (
+        np.array([
+            -np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
+            -np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
+            0.0,
+            np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
+            np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
+        ]),
+        np.array([
+            (322 - 13 * np.sqrt(70)) / 900,
+            (322 + 13 * np.sqrt(70)) / 900,
+            128 / 225,
+            (322 + 13 * np.sqrt(70)) / 900,
+            (322 - 13 * np.sqrt(70)) / 900,
+        ]),
+    ),
+}
+
 
 @njit
 def _assemble_csr_1d_core(Ke_all, cells, n_nodes):
@@ -159,6 +182,79 @@ def _assemble_diffusion_mass_core(h, lam, coeff):
     return Ke_all
 
 
+@njit
+def _assemble_diffusion_mass_csr_direct(VX, EToV, n_nodes, lam, coeff):
+    """
+    Fused assembly: compute element matrices and CSR data in one pass.
+    Avoids intermediate Ke_all array and separate element length computation.
+    """
+    n_elem = EToV.shape[0]
+
+    # CSR structure for 1D sorted mesh
+    nnz = 3 * n_nodes - 2
+    indptr = np.empty(n_nodes + 1, dtype=np.int32)
+    indices = np.empty(nnz, dtype=np.int32)
+    data = np.zeros(nnz, dtype=np.float64)
+
+    # Fill indptr
+    indptr[0] = 0
+    indptr[1] = 2
+    for i in range(2, n_nodes):
+        indptr[i] = indptr[i - 1] + 3
+    indptr[n_nodes] = indptr[n_nodes - 1] + 2
+
+    # Fill indices
+    indices[0] = 0
+    indices[1] = 1
+    idx = 2
+    for i in range(1, n_nodes - 1):
+        indices[idx] = i - 1
+        indices[idx + 1] = i
+        indices[idx + 2] = i + 1
+        idx += 3
+    indices[idx] = n_nodes - 2
+    indices[idx + 1] = n_nodes - 1
+
+    # Assemble directly into CSR data
+    for e in range(n_elem):
+        n1 = EToV[e, 0]
+        n2 = EToV[e, 1]
+
+        # Compute element length inline
+        hi = VX[n2] - VX[n1]
+
+        # Compute element matrix entries
+        c_diff = lam / hi
+        c_mass = coeff * hi / 6.0
+        k00 = c_diff + 2.0 * c_mass
+        k01 = -c_diff + c_mass
+        k11 = c_diff + 2.0 * c_mass
+
+        # Row n1
+        if n1 == 0:
+            idx_n1_n1 = 0
+            idx_n1_n2 = 1
+        else:
+            idx_n1_n1 = indptr[n1] + 1
+            idx_n1_n2 = indptr[n1] + 2
+
+        data[idx_n1_n1] += k00
+        data[idx_n1_n2] += k01
+
+        # Row n2
+        if n2 == n_nodes - 1:
+            idx_n2_n2 = indptr[n2] + 1
+            idx_n2_n1 = indptr[n2]
+        else:
+            idx_n2_n2 = indptr[n2] + 1
+            idx_n2_n1 = indptr[n2]
+
+        data[idx_n2_n1] += k01  # k10 = k01 (symmetric)
+        data[idx_n2_n2] += k11
+
+    return data, indices, indptr
+
+
 def assemble_diffusion_mass(
     mesh: Mesh, lam: float = 1.0, coeff: float = 1.0
 ) -> csr_matrix:
@@ -166,9 +262,10 @@ def assemble_diffusion_mass(
     Assemble global stiffness matrix for -lam*u'' + coeff*u.
     Combines diffusion and mass assembly to avoid expensive sparse matrix addition.
     """
-    h = _element_lengths_1d(mesh)
-    Ke_all = _assemble_diffusion_mass_core(h, lam, coeff)
-    return assemble_matrix_csr_1d(Ke_all, mesh.EToV, mesh.nonodes)
+    data, indices, indptr = _assemble_diffusion_mass_csr_direct(
+        mesh.VX, mesh.EToV, mesh.nonodes, lam, coeff
+    )
+    return csr_matrix((data, indices, indptr), shape=(mesh.nonodes, mesh.nonodes))
 
 
 def assemble_mass(mesh: Mesh, coeff: float = 1.0) -> csr_matrix:
@@ -224,38 +321,10 @@ def assemble_load(mesh: Mesh, f_func, n_quad: int = 5) -> np.ndarray:
     """
     Assemble global load vector using Gaussian quadrature for 1D P1 elements.
     """
-    # Gauss quadrature points and weights on [-1, 1]
-    # Reference: Course lecture notes, p. 127
-    if n_quad == 1:
-        pts = np.array([0.0])
-        wts = np.array([2.0])
-    elif n_quad == 2:
-        pts = np.array([-1.0 / np.sqrt(3), 1.0 / np.sqrt(3)])
-        wts = np.array([1.0, 1.0])
-    elif n_quad == 3:
-        pts = np.array([-np.sqrt(3 / 5), 0.0, np.sqrt(3 / 5)])
-        wts = np.array([5 / 9, 8 / 9, 5 / 9])
-    elif n_quad == 5:
-        pts = np.array(
-            [
-                -np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
-                -np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
-                0.0,
-                np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
-                np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
-            ]
-        )
-        wts = np.array(
-            [
-                (322 - 13 * np.sqrt(70)) / 900,
-                (322 + 13 * np.sqrt(70)) / 900,
-                128 / 225,
-                (322 + 13 * np.sqrt(70)) / 900,
-                (322 - 13 * np.sqrt(70)) / 900,
-            ]
-        )
-    else:
+    if n_quad not in _GAUSS_QUAD:
         raise ValueError(f"Unsupported n_quad={n_quad}. Use 1, 2, 3, or 5.")
+
+    pts, wts = _GAUSS_QUAD[n_quad]
 
     # Get element coordinates
     x_left = mesh.VX[mesh.EToV[:, 0]][:, None]

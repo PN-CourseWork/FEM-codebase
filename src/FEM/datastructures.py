@@ -32,10 +32,8 @@ class Mesh:
         ), perm
 
 
-
 @dataclass
 class Mesh2d:
-    """Finite element mesh for 2D."""
 
     VX: np.ndarray
     VY: np.ndarray
@@ -46,8 +44,6 @@ class Mesh2d:
     noelms2: int = None
 
     # Geometric information
-    vec_t: np.ndarray   # tangential vector
-    vec_n: np.ndarray   # normal vector
 
     def __post_init__(self):
         # Sort

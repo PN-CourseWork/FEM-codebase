@@ -92,6 +92,7 @@ def solve_reaction_diffusion_1d_amr_hierarchical(
         error_metric = np.max(errors)  # Use max for absolute marking consistency
 
         # Record statistics (report coarse DOF since that's what we're refining)
+        """
         stats.append(
             {
                 "iteration": iteration,
@@ -99,6 +100,7 @@ def solve_reaction_diffusion_1d_amr_hierarchical(
                 "error_est": error_metric,
             }
         )
+        """
 
         # Check stopping criteria
         reached_tol = tol is not None and error_metric < tol

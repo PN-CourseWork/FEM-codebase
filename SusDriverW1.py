@@ -29,6 +29,9 @@ for i in range(fac):
     xAMR, u, iter = DriverAMR17(L, c, d, x, func, tol, maxit)
 CPUtime = (time.time() - start_time) / fac
 
+print(10*"=")
+print(f"CPU time: {CPUtime:.4f} s")
+
 # Plot
 plt.figure()
 plt.plot(xAMR, funu(xAMR), linewidth=2)

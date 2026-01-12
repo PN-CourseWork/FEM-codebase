@@ -122,6 +122,66 @@ def _estimate_error_l2_core(
     return np.sqrt(error_indicators)
 
 
+@njit
+def _estimate_error_l2_extract(
+    VX_fine: np.ndarray,
+    EToV_fine: np.ndarray,
+    u_fine: np.ndarray,
+    VX_coarse: np.ndarray,
+    EToV_coarse: np.ndarray,
+    u_coarse: np.ndarray,
+    parent_map: np.ndarray,
+) -> np.ndarray:
+    """
+    JIT-compiled A posteriori Error Estimator (Two-Grid L2 Norm).
+    """
+    n_fine = EToV_fine.shape[0]
+    n_coarse = EToV_coarse.shape[0]
+
+    error_indicators = np.zeros(n_coarse)
+    fine_elem_errors = np.zeros(n_fine)
+
+    for i in range(n_fine):
+        # Fine element data
+        node_L = EToV_fine[i, 0]
+        node_R = EToV_fine[i, 1]
+        xl = VX_fine[node_L]
+        xr = VX_fine[node_R]
+        hf = xr - xl
+        ufl = u_fine[node_L]
+        ufr = u_fine[node_R]
+
+        # Coarse parent data
+        parent = parent_map[i]
+        parent_node_L = EToV_coarse[parent, 0]
+        parent_node_R = EToV_coarse[parent, 1]
+        xcl = VX_coarse[parent_node_L]
+        xcr = VX_coarse[parent_node_R]
+        hc = xcr - xcl
+        ucl = u_coarse[parent_node_L]
+        ucr = u_coarse[parent_node_R]
+
+        # Compute error at left and right nodes of fine element
+        t_L = (xl - xcl) / hc
+        u_coarse_L = (1.0 - t_L) * ucl + t_L * ucr
+
+        t_R = (xr - xcl) / hc
+        u_coarse_R = (1.0 - t_R) * ucl + t_R * ucr
+
+        # Error at nodes
+        e_L = ufl - u_coarse_L
+        e_R = ufr - u_coarse_R
+
+        elem_err_sq = (hf / 3.0) * (e_L**2 + e_L * e_R + e_R**2)
+        fine_elem_errors[i] = elem_err_sq
+
+    # Accumulate into coarse elements
+    for i in range(n_fine):
+        error_indicators[parent_map[i]] += fine_elem_errors[i]
+
+    return np.sqrt(error_indicators)
+
+
 def estimate_error_l2(
     mesh_fine: Mesh,
     u_fine: np.ndarray,
@@ -132,37 +192,14 @@ def estimate_error_l2(
     """
     A posteriori Error Estimator (Two-Grid L2 Norm).
     """
-    # Fine mesh data
-    x_L = mesh_fine.VX[mesh_fine.EToV[:, 0]]
-    x_R = mesh_fine.VX[mesh_fine.EToV[:, 1]]
-    h_fine = x_R - x_L
-
-    u_fine_L = u_fine[mesh_fine.EToV[:, 0]]
-    u_fine_R = u_fine[mesh_fine.EToV[:, 1]]
-
-    # Coarse mesh data mapped to fine elements
-    parent_cells = mesh_coarse.EToV[parent_map]
-
-    xc_L = mesh_coarse.VX[parent_cells[:, 0]]
-    xc_R = mesh_coarse.VX[parent_cells[:, 1]]
-
-    uc_L = u_coarse[parent_cells[:, 0]]
-    uc_R = u_coarse[parent_cells[:, 1]]
-
-    hc = xc_R - xc_L
-
-    return _estimate_error_l2_core(
-        x_L,
-        h_fine,
-        u_fine_L,
-        u_fine_R,
-        xc_L,
-        hc,
-        uc_L,
-        uc_R,
+    return _estimate_error_l2_extract(
+        mesh_fine.VX,
+        mesh_fine.EToV,
+        u_fine,
+        mesh_coarse.VX,
+        mesh_coarse.EToV,
+        u_coarse,
         parent_map,
-        mesh_coarse.noelms,
-        mesh_fine.noelms,
     )
 
 

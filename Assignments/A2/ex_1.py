@@ -1,4 +1,4 @@
-from FEM.datastructures import Mesh2d
+#from FEM.datastructures import Mesh2d
 import numpy as np
 
 
