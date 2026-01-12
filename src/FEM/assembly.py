@@ -2,71 +2,270 @@ import numpy as np
 from numba import njit
 from scipy.sparse import csr_matrix
 
+from .elements import advection
+from .datastructures import Mesh
+
 
 @njit
-def _build_csr_1d(Ke_all, n_nodes):
-    """Build CSR arrays directly for 1D tridiagonal FEM matrix."""
+def _assemble_csr_1d_core(Ke_all, cells, n_nodes):
+    """
+    Directly assemble CSR arrays for 1D problems.
+
+    """
     n_elem = len(Ke_all)
 
-    # Tridiagonal: 2 entries in first/last row, 3 in middle rows
-    nnz = 2 + 3 * (n_nodes - 2) + 2 if n_nodes > 2 else (2 * n_nodes - 1)
+    indptr = np.empty(n_nodes + 1, dtype=np.int32)
+    indptr[0] = 0
+    nnz = 3 * n_nodes - 2
+    indices = np.empty(nnz, dtype=np.int32)
+    data = np.zeros(nnz, dtype=np.float64)
 
-    data = np.zeros(nnz)
-    indices = np.empty(nnz, dtype=np.int64)
-    indptr = np.empty(n_nodes + 1, dtype=np.int64)
+    # Fill indptr
+    indptr[0] = 0
+    indptr[1] = 2
+    for i in range(2, n_nodes):
+        indptr[i] = indptr[i - 1] + 3
+    indptr[n_nodes] = indptr[n_nodes - 1] + 2
 
-    # Build structure
-    idx = 0
-    for i in range(n_nodes):
-        indptr[i] = idx
-        if i > 0:
-            indices[idx] = i - 1
-            idx += 1
-        indices[idx] = i
-        idx += 1
-        if i < n_nodes - 1:
-            indices[idx] = i + 1
-            idx += 1
-    indptr[n_nodes] = idx
+    # Fill indices (assuming sorted structure)
+    indices[0] = 0
+    indices[1] = 1
 
-    # Accumulate element contributions
+    idx = 2
+    for i in range(1, n_nodes - 1):
+        indices[idx] = i - 1
+        indices[idx + 1] = i
+        indices[idx + 2] = i + 1
+        idx += 3
+
+    # Row N-1: N-2, N-1
+    indices[idx] = n_nodes - 2
+    indices[idx + 1] = n_nodes - 1
+
+    # Now fill data by iterating over elements
     for e in range(n_elem):
-        n1, n2 = e, e + 1
+        n1 = cells[e, 0]
+        n2 = cells[e, 1]
 
-        # Row n1: entries at (n1, n1) and (n1, n2)
-        row_start = indptr[n1]
         if n1 == 0:
-            data[row_start] += Ke_all[e, 0, 0]      # (n1, n1)
-            data[row_start + 1] += Ke_all[e, 0, 1]  # (n1, n2)
+            idx_n1_n1 = 0
+            idx_n1_n2 = 1  
+        elif n1 == n_nodes - 1:
+            idx_n1_n1 = indptr[n1] + 1
+            idx_n1_n2 = indptr[n1]  
         else:
-            data[row_start + 1] += Ke_all[e, 0, 0]  # (n1, n1) - middle entry
-            data[row_start + 2] += Ke_all[e, 0, 1]  # (n1, n2) - right entry
+            idx_n1_n1 = indptr[n1] + 1
+            if n2 == n1 + 1:
+                idx_n1_n2 = indptr[n1] + 2
+            else:
+                idx_n1_n2 = indptr[n1]
 
-        # Row n2: entries at (n2, n1) and (n2, n2)
-        row_start = indptr[n2]
-        data[row_start] += Ke_all[e, 1, 0]          # (n2, n1) - left entry
-        if n2 == n_nodes - 1:
-            data[row_start + 1] += Ke_all[e, 1, 1]  # (n2, n2)
+        data[idx_n1_n1] += Ke_all[e, 0, 0]
+        data[idx_n1_n2] += Ke_all[e, 0, 1]
+
+        # Contribution to Row n2
+        if n2 == 0:
+            idx_n2_n2 = 0
+            idx_n2_n1 = 1
+        elif n2 == n_nodes - 1:
+            idx_n2_n2 = indptr[n2] + 1
+            idx_n2_n1 = indptr[n2]
         else:
-            data[row_start + 1] += Ke_all[e, 1, 1]  # (n2, n2) - middle entry
+            idx_n2_n2 = indptr[n2] + 1
+            if n1 == n2 + 1:
+                idx_n2_n1 = indptr[n2] + 2
+            else:
+                idx_n2_n1 = indptr[n2]
+
+        data[idx_n2_n1] += Ke_all[e, 1, 0]
+        data[idx_n2_n2] += Ke_all[e, 1, 1]
 
     return data, indices, indptr
 
 
-def assemble_matrix_1d(Ke_all, n_nodes):
-    """Assemble 1D FEM matrix directly to CSR (optimal for tridiagonal)."""
-    data, indices, indptr = _build_csr_1d(Ke_all, n_nodes)
+def assemble_matrix_csr_1d(Ke_all, cells, n_nodes):
+    """Assemble global matrix from element matrices (1D sorted meshes only)."""
+    data, indices, indptr = _assemble_csr_1d_core(Ke_all, cells, n_nodes)
     return csr_matrix((data, indices, indptr), shape=(n_nodes, n_nodes))
 
 
 @njit
-def assemble_vector(elements, fe_all, n_nodes):
-    """Assemble element load vectors into global vector."""
-    b = np.zeros(n_nodes)
-    n_elem, npe = fe_all.shape
+def _assemble_diffusion_core(h, lam):
+    n_elem = len(h)
+    Ke_all = np.zeros((n_elem, 2, 2))
+    for e in range(n_elem):
+        c = lam / h[e]
+        Ke_all[e, 0, 0] = c
+        Ke_all[e, 0, 1] = -c
+        Ke_all[e, 1, 0] = -c
+        Ke_all[e, 1, 1] = c
+    return Ke_all
+
+
+def assemble_diffusion(mesh: Mesh, lam=1.0) -> csr_matrix:
+    """
+    Assemble global diffusion matrix for 1D P1 elements.
+
+    """
+    h = _element_lengths_1d(mesh)
+    Ke_all = _assemble_diffusion_core(h, lam)
+    return assemble_matrix_csr_1d(Ke_all, mesh.EToV, mesh.nonodes)
+
+
+def _element_lengths_1d(mesh: Mesh) -> np.ndarray:
+    """Compute element lengths for 1D meshes."""
+    x_left = mesh.VX[mesh.EToV[:, 0]].ravel()
+    x_right = mesh.VX[mesh.EToV[:, 1]].ravel()
+    h = np.abs(x_right - x_left)
+    if np.any(h <= 0.0):
+        raise ValueError(
+            f"Non-positive element length detected: h={h}, VX={mesh.VX}, EToV={mesh.EToV}"
+        )
+    return h
+
+
+@njit
+def _assemble_mass_core(h, coeff):
+    n_elem = len(h)
+    Ke_all = np.zeros((n_elem, 2, 2))
+    for e in range(n_elem):
+        c = coeff * h[e] / 6.0
+        Ke_all[e, 0, 0] = 2.0 * c
+        Ke_all[e, 0, 1] = c
+        Ke_all[e, 1, 0] = c
+        Ke_all[e, 1, 1] = 2.0 * c
+    return Ke_all
+
+
+@njit
+def _assemble_diffusion_mass_core(h, lam, coeff):
+    n_elem = len(h)
+    Ke_all = np.zeros((n_elem, 2, 2))
+    for e in range(n_elem):
+        hi = h[e]
+
+        # Diffusion part
+        c_diff = lam / hi
+
+        # Mass part
+        c_mass = coeff * hi / 6.0
+
+        # Combine
+        Ke_all[e, 0, 0] = c_diff + 2.0 * c_mass
+        Ke_all[e, 0, 1] = -c_diff + c_mass
+        Ke_all[e, 1, 0] = -c_diff + c_mass
+        Ke_all[e, 1, 1] = c_diff + 2.0 * c_mass
+
+    return Ke_all
+
+
+def assemble_diffusion_mass(
+    mesh: Mesh, lam: float = 1.0, coeff: float = 1.0
+) -> csr_matrix:
+    """
+    Assemble global stiffness matrix for -lam*u'' + coeff*u.
+    Combines diffusion and mass assembly to avoid expensive sparse matrix addition.
+    """
+    h = _element_lengths_1d(mesh)
+    Ke_all = _assemble_diffusion_mass_core(h, lam, coeff)
+    return assemble_matrix_csr_1d(Ke_all, mesh.EToV, mesh.nonodes)
+
+
+def assemble_mass(mesh: Mesh, coeff: float = 1.0) -> csr_matrix:
+    """
+    Assemble global mass matrix for 1D P1 elements.
+    """
+    h = _element_lengths_1d(mesh)
+    Ke_all = _assemble_mass_core(h, coeff)
+    return assemble_matrix_csr_1d(Ke_all, mesh.EToV, mesh.nonodes)
+
+
+def assemble_advection(mesh: Mesh, psi: float) -> csr_matrix:
+    """
+    Assemble global advection matrix for 1D P1 elements.
+    """
+    h = _element_lengths_1d(mesh)
+    Ke_all = np.zeros((mesh.noelms, 2, 2))
+    for e, hi in enumerate(h):
+        Ke_all[e] = advection(hi, psi)
+    return assemble_matrix_csr_1d(Ke_all, mesh.EToV, mesh.nonodes)
+
+
+@njit
+def _assemble_load_core(f_vals, pts, wts, h, cells, nonodes):
+    b = np.zeros(nonodes)
+    n_elem, n_quad = f_vals.shape
 
     for e in range(n_elem):
-        for i in range(npe):
-            b[elements[e, i]] += fe_all[e, i]
+        detJ = h[e] / 2.0
+        val0 = 0.0
+        val1 = 0.0
+
+        for q in range(n_quad):
+            pt = pts[q]
+            wt = wts[q]
+            f_val = f_vals[e, q]
+
+            # Basis functions
+            N1 = 0.5 * (1 - pt)
+            N2 = 0.5 * (1 + pt)
+
+            common = f_val * wt * detJ
+            val0 += common * N1
+            val1 += common * N2
+
+        b[cells[e, 0]] += val0
+        b[cells[e, 1]] += val1
 
     return b
+
+
+def assemble_load(mesh: Mesh, f_func, n_quad: int = 5) -> np.ndarray:
+    """
+    Assemble global load vector using Gaussian quadrature for 1D P1 elements.
+    """
+    # Gauss quadrature points and weights on [-1, 1]
+    # Reference: Course lecture notes, p. 127
+    if n_quad == 1:
+        pts = np.array([0.0])
+        wts = np.array([2.0])
+    elif n_quad == 2:
+        pts = np.array([-1.0 / np.sqrt(3), 1.0 / np.sqrt(3)])
+        wts = np.array([1.0, 1.0])
+    elif n_quad == 3:
+        pts = np.array([-np.sqrt(3 / 5), 0.0, np.sqrt(3 / 5)])
+        wts = np.array([5 / 9, 8 / 9, 5 / 9])
+    elif n_quad == 5:
+        pts = np.array(
+            [
+                -np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
+                -np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
+                0.0,
+                np.sqrt(5 - 2 * np.sqrt(10 / 7)) / 3,
+                np.sqrt(5 + 2 * np.sqrt(10 / 7)) / 3,
+            ]
+        )
+        wts = np.array(
+            [
+                (322 - 13 * np.sqrt(70)) / 900,
+                (322 + 13 * np.sqrt(70)) / 900,
+                128 / 225,
+                (322 + 13 * np.sqrt(70)) / 900,
+                (322 - 13 * np.sqrt(70)) / 900,
+            ]
+        )
+    else:
+        raise ValueError(f"Unsupported n_quad={n_quad}. Use 1, 2, 3, or 5.")
+
+    # Get element coordinates
+    x_left = mesh.VX[mesh.EToV[:, 0]][:, None]
+    x_right = mesh.VX[mesh.EToV[:, 1]][:, None]
+
+    x_phys = x_left + 0.5 * (pts[None, :] + 1) * (x_right - x_left)
+
+    n_elem = mesh.noelms
+    f_vals = f_func(x_phys.ravel()).reshape(n_elem, n_quad)
+
+    h = (x_right - x_left).ravel()
+
+    return _assemble_load_core(f_vals, pts, wts, h, mesh.EToV, mesh.nonodes)

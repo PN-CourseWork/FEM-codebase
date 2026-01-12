@@ -48,17 +48,3 @@ def advection(h: float, psi: float) -> np.ndarray:
     Ke[1, 0] = -c
     Ke[1, 1] = c
     return Ke
-
-
-@njit
-def load(h: float, f: float = 1.0) -> np.ndarray:
-    """
-    Element load vector for source term f.
-
-    Weak form: f * ∫ v dx
-    """
-    fe = np.empty(2)
-    c = f * h / 2.0
-    fe[0] = c
-    fe[1] = c
-    return fe

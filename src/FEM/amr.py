@@ -1,133 +1,243 @@
 import numpy as np
+from typing import Tuple, Callable
 from numba import njit
 
-from .mesh import Mesh
+from .datastructures import Mesh
 
 
 @njit
-def _compute_refinement_errors(VX, EToV, u_left, u_right, u_mid):
-    """Compute Δerr_i = |u(x_mid) - 0.5*(u(x1) + u(x2))| * sqrt(h/3)"""
+def _refine_1d_sorted(VX, EToV, marked_mask):
+    """
+    Optimized refinement for 1D meshes that maintains sorted order.
+    """
     n_elem = len(EToV)
-    errors = np.empty(n_elem)
+    n_marked = np.sum(marked_mask)
+
+    n_new_elem = n_elem + n_marked
+    n_new_nodes = len(VX) + n_marked
+
+    new_VX = np.empty(n_new_nodes, dtype=VX.dtype)
+    new_EToV = np.empty((n_new_elem, 2), dtype=EToV.dtype)
+    parent_map = np.empty(n_new_elem, dtype=np.int64)
+
+    vx_idx = 0
+    elem_idx = 0
 
     for e in range(n_elem):
-        n1, n2 = EToV[e]
-        h = VX[n2] - VX[n1]
-        delta = u_mid[e] - 0.5 * (u_left[e] + u_right[e])
-        errors[e] = np.abs(delta) * np.sqrt(h / 3.0)
+        # Add left node
+        new_VX[vx_idx] = VX[e]
+        vx_idx += 1
 
-    return errors
+        if marked_mask[e]:
+            # Refine element e
+            # Create midpoint
+            mid = 0.5 * (VX[e] + VX[e + 1])
+            new_VX[vx_idx] = mid
+            vx_idx += 1
+
+            # Create 2 new elements
+            # Elem 1: [current_node_idx-1, current_node_idx] (Left -> Mid)
+            new_EToV[elem_idx, 0] = vx_idx - 2
+            new_EToV[elem_idx, 1] = vx_idx - 1
+            parent_map[elem_idx] = e
+            elem_idx += 1
+
+            # Elem 2: [current_node_idx, current_node_idx+1] (Mid -> Right)
+            new_EToV[elem_idx, 0] = vx_idx - 1
+            new_EToV[elem_idx, 1] = vx_idx
+            parent_map[elem_idx] = e
+            elem_idx += 1
+        else:
+            # Copy element e
+            # It connects [vx_idx-1, vx_idx]
+            new_EToV[elem_idx, 0] = vx_idx - 1
+            new_EToV[elem_idx, 1] = vx_idx
+            parent_map[elem_idx] = e
+            elem_idx += 1
+
+    # Add the very last node
+    new_VX[vx_idx] = VX[-1]
+
+    return new_VX, new_EToV, parent_map
+
+
+def refine(mesh: Mesh, marked: np.ndarray) -> Tuple[Mesh, np.ndarray]:
+    """Refine marked elements by splitting them at the midpoint (1D only)."""
+    marked = np.asarray(marked)
+
+    # Create boolean mask for efficient Numba lookup
+    marked_mask = np.zeros(mesh.noelms, dtype=bool)
+    marked_mask[marked] = True
+
+    new_VX, new_cells, parent_map = _refine_1d_sorted(
+        mesh.VX, mesh.EToV, marked_mask
+    )
+    return Mesh(VX=new_VX, EToV=new_cells), parent_map
+
+
+@njit
+def _estimate_error_l2_core(
+    x_L, h_fine, u_fine_L, u_fine_R, xc_L, hc, uc_L, uc_R, parent_map, n_coarse, n_fine
+):
+    """
+    Compute L2 error using exact analytical integration.
+
+    """
+    error_indicators = np.zeros(n_coarse)
+    fine_elem_errors = np.zeros(n_fine)
+
+    for i in range(n_fine):
+        # Fine element data
+        xl = x_L[i]
+        hf = h_fine[i]
+        ufl = u_fine_L[i]
+        ufr = u_fine_R[i]
+
+        # Coarse parent data
+        xcl = xc_L[i]
+        ucl = uc_L[i]
+        ucr = uc_R[i]
+
+        # Compute error at left and right nodes of fine element
+        t_L = (xl - xcl) / hc[i]
+        u_coarse_L = (1.0 - t_L) * ucl + t_L * ucr
+
+        # Right endpoint: x = xl + hf
+        x_R = xl + hf
+        t_R = (x_R - xcl) / hc[i]
+        u_coarse_R = (1.0 - t_R) * ucl + t_R * ucr
+
+        # Error at nodes
+        e_L = ufl - u_coarse_L
+        e_R = ufr - u_coarse_R
+
+        elem_err_sq = (hf / 3.0) * (e_L**2 + e_L * e_R + e_R**2)
+
+        fine_elem_errors[i] = elem_err_sq
+
+    # Accumulate into coarse elements
+    for i in range(n_fine):
+        error_indicators[parent_map[i]] += fine_elem_errors[i]
+
+    return np.sqrt(error_indicators)
+
+
+def estimate_error_l2(
+    mesh_fine: Mesh,
+    u_fine: np.ndarray,
+    mesh_coarse: Mesh,
+    u_coarse: np.ndarray,
+    parent_map: np.ndarray,
+) -> np.ndarray:
+    """
+    A posteriori Error Estimator (Two-Grid L2 Norm).
+    """
+    # Fine mesh data
+    x_L = mesh_fine.VX[mesh_fine.EToV[:, 0]]
+    x_R = mesh_fine.VX[mesh_fine.EToV[:, 1]]
+    h_fine = x_R - x_L
+
+    u_fine_L = u_fine[mesh_fine.EToV[:, 0]]
+    u_fine_R = u_fine[mesh_fine.EToV[:, 1]]
+
+    # Coarse mesh data mapped to fine elements
+    parent_cells = mesh_coarse.EToV[parent_map]
+
+    xc_L = mesh_coarse.VX[parent_cells[:, 0]]
+    xc_R = mesh_coarse.VX[parent_cells[:, 1]]
+
+    uc_L = u_coarse[parent_cells[:, 0]]
+    uc_R = u_coarse[parent_cells[:, 1]]
+
+    hc = xc_R - xc_L
+
+    return _estimate_error_l2_core(
+        x_L,
+        h_fine,
+        u_fine_L,
+        u_fine_R,
+        xc_L,
+        hc,
+        uc_L,
+        uc_R,
+        parent_map,
+        mesh_coarse.noelms,
+        mesh_fine.noelms,
+    )
 
 
 def refinement_error(mesh: Mesh, func) -> np.ndarray:
-    """Compute refinement error estimates for all elements."""
-    VX, EToV = mesh.VX, mesh.EToV
-
-    x_left = VX[EToV[:, 0]]
-    x_right = VX[EToV[:, 1]]
+    """
+    Compute refinement error estimates for all elements.
+    """
+    cells = mesh.EToV
+    VX = mesh.VX
+    x_left = VX[cells[:, 0]][:, None]
+    x_right = VX[cells[:, 1]][:, None]
     x_mid = 0.5 * (x_left + x_right)
+
+    h = np.linalg.norm(x_right - x_left, axis=1, keepdims=True)
 
     u_left = func(x_left)
     u_right = func(x_right)
     u_mid = func(x_mid)
 
-    return _compute_refinement_errors(VX, EToV, u_left, u_right, u_mid)
+    # Difference between exact solution and linear interpolant at the midpoint
+    delta = np.abs(u_mid - 0.5 * (u_left + u_right))
+
+    # Estimate L2 error on the element
+    return delta * np.sqrt(h / 3.0)
 
 
-@njit
-def _build_refined_mesh(VX, EToV, marked_mask):
-    """Build refined mesh arrays."""
-    n_elem = len(EToV)
-    n_nodes = len(VX)
-    n_marked = np.sum(marked_mask)
-
-    n_new_nodes = n_nodes + n_marked
-    n_new_elem = n_elem + n_marked
-
-    new_VX = np.empty(n_new_nodes)
-    new_EToV = np.empty((n_new_elem, 2), dtype=np.int64)
-
-    # Copy original nodes
-    for i in range(n_nodes):
-        new_VX[i] = VX[i]
-
-    # Add midpoints and build elements
-    next_node = n_nodes
-    next_elem = 0
-
-    for e in range(n_elem):
-        n1, n2 = EToV[e, 0], EToV[e, 1]
-
-        if marked_mask[e]:
-            x_mid = 0.5 * (VX[n1] + VX[n2])
-            mid_idx = next_node
-            new_VX[mid_idx] = x_mid
-            next_node += 1
-
-            new_EToV[next_elem, 0] = n1
-            new_EToV[next_elem, 1] = mid_idx
-            next_elem += 1
-
-            new_EToV[next_elem, 0] = mid_idx
-            new_EToV[next_elem, 1] = n2
-            next_elem += 1
-        else:
-            new_EToV[next_elem, 0] = n1
-            new_EToV[next_elem, 1] = n2
-            next_elem += 1
-
-    return new_VX, new_EToV
-
-
-@njit
-def _reorder_mesh_1d(VX, EToV):
-    """Reorder nodes by coordinate and update connectivity."""
-    n_nodes = len(VX)
-    n_elem = len(EToV)
-
-    order = np.argsort(VX)
-
-    inverse = np.empty(n_nodes, dtype=np.int64)
-    for i in range(n_nodes):
-        inverse[order[i]] = i
-
-    new_VX = np.empty(n_nodes)
-    for i in range(n_nodes):
-        new_VX[i] = VX[order[i]]
-
-    new_EToV = np.empty((n_elem, 2), dtype=np.int64)
-    for e in range(n_elem):
-        new_EToV[e, 0] = inverse[EToV[e, 0]]
-        new_EToV[e, 1] = inverse[EToV[e, 1]]
-
-    return new_VX, new_EToV
-
-
-def mark_elements(errors: np.ndarray, alpha: float = 0.5, tol: float = None) -> np.ndarray:
-    """
-    Mark elements for refinement.
-
-    Criteria:
-        tol=None:  err > α * max(err)  (relative to max)
-        tol=value: err > α * tol       (absolute threshold)
-    """
-    if tol is None:
-        threshold = alpha * np.max(errors)
-    else:
-        threshold = alpha * tol
+def mark_elements(
+    errors: np.ndarray, alpha: float = 0.5, tol: float = None
+) -> np.ndarray:
+    """Return indices of elements to refine."""
+    threshold = alpha * (tol if tol is not None else np.max(errors))
     return np.where(errors > threshold)[0]
 
 
-def refine(mesh: Mesh, marked) -> Mesh:
-    """Refine marked elements by splitting at midpoint."""
-    marked = np.asarray(marked)
-    if len(marked) == 0:
-        return mesh
+def run_amr(
+    mesh: Mesh,
+    solve_fn: Callable[[Mesh], np.ndarray],
+    estimator_fn: Callable[[Mesh, np.ndarray], np.ndarray],
+    marker_fn: Callable[[np.ndarray], np.ndarray],
+    metric_fn: Callable[[np.ndarray], float] = lambda e: np.linalg.norm(e),
+    stop_fn: Callable[
+        [Mesh, np.ndarray, np.ndarray, float, dict, list[dict]], bool
+    ] = None,
+    record_fn: Callable[[Mesh, np.ndarray, np.ndarray, float], dict] = None,
+    tol: float = None,
+    max_dof: int = None,
+    max_iter: int = None,
+) -> Tuple[Mesh, np.ndarray, list[dict]]:
+    stats: list[dict] = []
+    iteration = 0
 
-    marked_mask = np.zeros(mesh.n_elem, dtype=np.bool_)
-    marked_mask[marked] = True
+    while True:
+        u = solve_fn(mesh)
+        est_errors = estimator_fn(mesh, u)
+        metric = metric_fn(est_errors)
 
-    new_VX, new_EToV = _build_refined_mesh(mesh.VX, mesh.EToV, marked_mask)
-    new_VX, new_EToV = _reorder_mesh_1d(new_VX, new_EToV)
+        extra = record_fn(mesh, u, est_errors, metric) if record_fn else {}
+        entry = {"iter": iteration, "dof": mesh.nonodes, "error_est": metric}
+        entry.update(extra)
+        stats.append(entry)
 
-    return Mesh(new_VX, new_EToV)
+        reached_tol = tol is not None and metric < tol
+        reached_dof = max_dof is not None and mesh.nonodes >= max_dof
+        reached_iter = max_iter is not None and len(stats) >= max_iter
+        custom_stop = (
+            stop_fn(mesh, u, est_errors, metric, entry, stats) if stop_fn else False
+        )
+        if reached_tol or reached_dof or reached_iter or custom_stop:
+            break
+
+        marked = marker_fn(est_errors)
+        if len(marked) == 0:
+            break
+
+        mesh, _ = refine(mesh, marked)
+        iteration += 1
+
+    return mesh, u, stats

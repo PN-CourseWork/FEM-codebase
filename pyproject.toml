@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = "==3.12.*"
 license = { text = "MIT" }
 authors = [
-    { name = "Philip Korsager Nickel", email = "s214960@dtu.dk" }
+    { name = "Philip Korsager Nickel, Aske Schroder Nielsen", email = "s214960@dtu.dk" }
 ]
 
 # All dependencies (runtime, docs, and dev)
@@ -22,6 +22,8 @@ dependencies = [
   "matplotlib>=3.9.0",
   "seaborn>=0.13.0",
   "pandas>=2.2.0",
+  "sympy>=1.14.0",
+  "snakeviz>=2.2.2",
 ]
 
 [tool.setuptools]
@@ -29,6 +31,11 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
 
 
 
