@@ -39,28 +39,19 @@ class Mesh2d:
 
     VX: np.ndarray
     VY: np.ndarray
-    EToV: np.ndarray
+    EToV: np.ndarray # Element to vertex mapping. Ordered counterclockwise 
 
     nonodes: int = None
-    noelms: int = None
+    noelms1: int = None
+    noelms2: int = None
+
+    # Geometric information
+    vec_t: np.ndarray   # tangential vector
+    vec_n: np.ndarray   # normal vector
 
     def __post_init__(self):
+        # Sort
         self.nonodes = len(self.VX)
-        self.noelms = len(self.EToV)
+        self.noelms1 = len(self.EToV)
+        self.noelms2 = len(self.EToV)
 
-    def sorted(self):
-        """Return (new_mesh, permutation) with nodes sorted by coordinate."""
-        perm = np.argsort(self.VX.ravel())
-
-        inverse = np.empty(self.nonodes, dtype=np.int64)
-        inverse[perm] = np.arange(self.nonodes)
-
-        new_VX = self.VX[perm]
-        new_VY = self.VY[perm]
-        new_cells = inverse[self.EToV]
-
-        return Mesh2d(
-            VX=new_VX,
-            VY=new_VY,
-            EToV=new_cells,
-        ), perm
