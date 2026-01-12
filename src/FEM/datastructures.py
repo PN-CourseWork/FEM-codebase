@@ -30,3 +30,37 @@ class Mesh:
             VX=new_VX,
             EToV=new_cells,
         ), perm
+
+
+
+@dataclass
+class Mesh2d:
+    """Finite element mesh for 2D."""
+
+    VX: np.ndarray
+    VY: np.ndarray
+    EToV: np.ndarray
+
+    nonodes: int = None
+    noelms: int = None
+
+    def __post_init__(self):
+        self.nonodes = len(self.VX)
+        self.noelms = len(self.EToV)
+
+    def sorted(self):
+        """Return (new_mesh, permutation) with nodes sorted by coordinate."""
+        perm = np.argsort(self.VX.ravel())
+
+        inverse = np.empty(self.nonodes, dtype=np.int64)
+        inverse[perm] = np.arange(self.nonodes)
+
+        new_VX = self.VX[perm]
+        new_VY = self.VY[perm]
+        new_cells = inverse[self.EToV]
+
+        return Mesh2d(
+            VX=new_VX,
+            VY=new_VY,
+            EToV=new_cells,
+        ), perm
