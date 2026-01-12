@@ -1,5 +1,6 @@
 #from FEM.datastructures import Mesh2d
 import numpy as np
+from FEM.datastructures import Mesh2d 
 
 
 # EXERCISE 2.1
@@ -36,6 +37,19 @@ case1_expected_elmtab = np.array([
     [13, 18, 17], [14, 18, 13], [14, 19, 18], [15, 19, 14], [15, 20, 19], [16, 20, 15]
 ])
 
+case1_mesh = Mesh2d(x0=case1_x0,y0=case1_y0,L1=case1_L1,L2=case1_L2,noelms1=case1_noelms1,noelms2=case1_noelms2)
+
+# Assertions for Case 1 (rtol=1e-3 due to rounded expected values)
+np.testing.assert_allclose(case1_mesh.VX, case1_expected_x, rtol=1e-3, err_msg="Case 1 VX mismatch")
+np.testing.assert_allclose(case1_mesh.VY, case1_expected_y, rtol=1e-3, err_msg="Case 1 VY mismatch")
+np.testing.assert_array_equal(case1_mesh.EToV, case1_expected_elmtab, err_msg="Case 1 EToV mismatch")
+print("Case 1: PASSED")
+
+print(f"EToV case 1: {case1_mesh.EToV}")
+print(f"VX case 1: {case1_mesh.VX}")
+print(f"VY case 1: {case1_mesh.VY}")
+
+
 # =========================================
 # CASE 2:
 # =========================================
@@ -62,6 +76,19 @@ case2_expected_y = np.array([
 ])
 
 case2_expected_elmtab = case1_expected_elmtab  # Same as Case 1
+
+case2_mesh = Mesh2d(x0=case2_x0,y0=case2_y0,L1=case2_L1,L2=case2_L2,noelms1=case2_noelms1,noelms2=case2_noelms2)
+
+# Assertions for Case 2 (rtol=1e-3 due to rounded expected values)
+np.testing.assert_allclose(case2_mesh.VX, case2_expected_x, rtol=1e-3, err_msg="Case 2 VX mismatch")
+np.testing.assert_allclose(case2_mesh.VY, case2_expected_y, rtol=1e-3, err_msg="Case 2 VY mismatch")
+np.testing.assert_array_equal(case2_mesh.EToV, case2_expected_elmtab, err_msg="Case 2 EToV mismatch")
+print("Case 2: PASSED")
+
+
+print(f"EToV case 2: {case2_mesh.EToV}")
+print(f"VX case 2: {case2_mesh.VX}")
+print(f"VY case 2: {case2_mesh.VY}")
 
 
 
