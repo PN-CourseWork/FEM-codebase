@@ -24,6 +24,8 @@ dependencies = [
   "pandas>=2.2.0",
   "sympy>=1.14.0",
   "snakeviz>=2.2.2",
+  "line-profiler>=5.0.0",
+  "ipykernel>=7.1.0",
 ]
 
 [tool.setuptools]
@@ -36,6 +38,14 @@ where = ["src"]
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+
+[tool.ruff]
+exclude = ["SusDriverW2.py", "driver28b.py", "driver28c.py"]
 
 
 

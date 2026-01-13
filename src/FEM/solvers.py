@@ -1,131 +1,122 @@
+from __future__ import annotations
+
+from typing import Callable
+
 import numpy as np
+from numpy.typing import NDArray
 import scipy.sparse.linalg as spla
 
-from .assembly import (
-    assemble_diffusion,
-    assemble_diffusion_mass,
-    assemble_advection,
-    assemble_load,
-)
-from .boundary import apply_dirichlet
-from .datastructures import Mesh
-from .mesh import line_mesh
+from .assembly import assembly_2d
+from .boundary import dirbc_2d, get_boundary_edges, get_edge_midpoints, neubc_2d
+from .datastructures import BOTTOM, BOUNDARY_TOL, LEFT, Mesh2d
 
 
-def solve_advection_diffusion_1d(mesh: Mesh, eps: float, psi: float, f_func):
-    """
-    Solve -eps*u'' + psi*u' = f on 1D mesh with homogeneous Dirichlet BCs (ends).
-    """
-    A = assemble_diffusion(mesh, lam=eps) + assemble_advection(mesh, psi)
-    b = assemble_load(mesh, f_func)
-
-    apply_dirichlet(A, b, 0, 0.0)
-    apply_dirichlet(A, b, mesh.nonodes - 1, 0.0)
-
-    u = spla.spsolve(A, b)
-    return u, A, b
-
-
-def solve_bvp_1d(L: float, c: float, d: float, n_elem: int):
-    """
-    Solve u'' - u = 0 on [0, L] with u(0)=c, u(L)=d using linear FEM.
-    Follows the Matlab BVP1D signature: length and boundary values in, solution out.
-    """
-    mesh = line_mesh(L, n_elem)
-    u, A, b = solve_reaction_diffusion_1d(
-        mesh, lam=1.0, reaction=1.0, dirichlet_bc=([0, mesh.nonodes - 1], [c, d])
-    )
-    return mesh, u, A, b
+def _apply_neumann(
+    mesh: Mesh2d,
+    b: NDArray[np.float64],
+    side: int,
+    q_func: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+) -> NDArray[np.float64]:
+    """Apply Neumann BC on a boundary side."""
+    beds = get_boundary_edges(mesh, side)
+    midpts = get_edge_midpoints(beds, mesh)
+    q = q_func(midpts[:, 0], midpts[:, 1])
+    return neubc_2d(beds, q, mesh, b)
 
 
-def solve_reaction_diffusion_1d(mesh: Mesh, lam: float, reaction: float, dirichlet_bc):
-    """
-    Solve -lam*u'' + reaction*u = 0 on a 1D mesh with Dirichlet BCs.
-    dirichlet_bc: (nodes, values)
-    """
-    A = assemble_diffusion_mass(mesh, lam=lam, coeff=reaction)
-    b = np.zeros(mesh.nonodes)
+def solve_mixed_bc_2d(
+    mesh: Mesh2d,
+    q_tilde_func: Callable[
+        [NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]
+    ],
+    q_left: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+    q_bottom: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+    f_dirichlet: Callable[
+        [NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]
+    ],
+    lam1: float = 1,
+    lam2: float = 1,
+) -> NDArray[np.float64]:
+    """Solve 2D BVP with mixed BCs: Neumann on left/bottom, Dirichlet on right/top."""
+    qt = q_tilde_func(mesh.VX, mesh.VY)
+    A, b = assembly_2d(mesh, lam1, lam2, qt)
 
-    nodes, vals = dirichlet_bc
-    apply_dirichlet(A, b, nodes, vals)
+    b = _apply_neumann(mesh, b, LEFT, q_left)
+    b = _apply_neumann(mesh, b, BOTTOM, q_bottom)
 
-    u = spla.spsolve(A, b)
-    return u, A, b
+    right_nodes = np.where(np.abs(mesh.VX - (mesh.x0 + mesh.L1)) < BOUNDARY_TOL)[0] + 1
+    top_nodes = np.where(np.abs(mesh.VY - (mesh.y0 + mesh.L2)) < BOUNDARY_TOL)[0] + 1
+    gamma2_nodes = np.unique(np.concatenate([right_nodes, top_nodes]))
+    f = f_dirichlet(mesh.VX[gamma2_nodes - 1], mesh.VY[gamma2_nodes - 1])
+
+    A, b = dirbc_2d(gamma2_nodes, f, A, b)
+    return spla.spsolve(A, b)
 
 
-def solve_reaction_diffusion_1d_amr_hierarchical(
-    L: float,
-    c: float,
-    d: float,
-    x: np.ndarray,
-    f_func,
-    tol: float,
-    max_dof: int = 2000,
-    max_iter: int = None,
-):
-    from .amr import mark_elements, estimate_error_l2, refine
-    from .datastructures import Mesh
+def _q_zero(x: NDArray[np.float64], _y: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Zero Neumann boundary condition."""
+    return np.zeros_like(x)
 
-    n_elem = len(x) - 1
-    EToV = np.array([[i, i + 1] for i in range(n_elem)])
-    mesh_coarse = Mesh(VX=x, EToV=EToV)
 
-    def solve_bvp(m):
-        """Solve -u'' + u = f with Dirichlet BCs."""
-        A = assemble_diffusion_mass(m, lam=1.0, coeff=1.0)
-        b = assemble_load(m, lambda x: -f_func(x))
-        apply_dirichlet(A, b, np.array([0, m.nonodes - 1]), np.array([c, d]))
-        return spla.spsolve(A, b)
+def solve_dirichlet_bc_2d(
+    mesh: Mesh2d,
+    q_tilde_func: Callable[
+        [NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]
+    ],
+    f_dirichlet: Callable[
+        [NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]
+    ],
+    lam1: float = 1,
+    lam2: float = 1,
+) -> NDArray[np.float64]:
+    """Solve 2D BVP with Dirichlet BCs on all boundaries."""
+    from .boundary import get_boundary_nodes
 
-    # First iteration: solve on coarse, then refine ALL and solve on fine
-    u_coarse = solve_bvp(mesh_coarse)
-    marked_all = np.arange(mesh_coarse.noelms)
-    mesh_fine, parent_map = refine(mesh_coarse, marked_all)
-    u_fine = solve_bvp(mesh_fine)
+    qt = q_tilde_func(mesh.VX, mesh.VY)
+    A, b = assembly_2d(mesh, lam1, lam2, qt)
 
-    stats = []
-    iteration = 0
+    bnodes = get_boundary_nodes(mesh)
+    f = f_dirichlet(mesh.VX[bnodes - 1], mesh.VY[bnodes - 1])
 
-    while True:
-        # Estimate errors on coarse mesh by comparing with fine
-        errors = estimate_error_l2(mesh_fine, u_fine, mesh_coarse, u_coarse, parent_map)
-        error_metric = np.max(errors)  # Use max for absolute marking consistency
+    A, b = dirbc_2d(bnodes, f, A, b)
+    return spla.spsolve(A, b)
 
-        # Record statistics (report coarse DOF since that's what we're refining)
-        """
-        stats.append(
-            {
-                "iteration": iteration,
-                "dof": mesh_coarse.nonodes,
-                "error_est": error_metric,
-            }
-        )
-        """
 
-        # Check stopping criteria
-        reached_tol = tol is not None and error_metric < tol
-        reached_dof = max_dof is not None and mesh_coarse.nonodes >= max_dof
-        reached_iter = max_iter is not None and iteration >= max_iter
+def Driver28b(
+    x0: float,
+    y0: float,
+    L1: float,
+    L2: float,
+    noelms1: int,
+    noelms2: int,
+    lam1: float,
+    lam2: float,
+    fun: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+    qt: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+) -> tuple[
+    NDArray[np.float64], NDArray[np.float64], NDArray[np.int64], NDArray[np.float64]
+]:
+    """28b: Quarter domain with mixed BCs (Neumann left/bottom, Dirichlet right/top)."""
+    mesh = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=noelms1, noelms2=noelms2)
+    U = solve_mixed_bc_2d(mesh, qt, _q_zero, _q_zero, fun, lam1=lam1, lam2=lam2)
+    return mesh.VX, mesh.VY, mesh.EToV - 1, U
 
-        if reached_tol or reached_dof or reached_iter:
-            # Return coarse mesh (it's the one we check convergence on)
-            break
 
-        # Mark elements on coarse mesh for refinement (absolute marking)
-        marked = mark_elements(errors, alpha=1.0, tol=tol)
-
-        if len(marked) == 0:
-            break
-
-        mesh_coarse, parent_map_marked = refine(mesh_coarse, marked)
-
-        u_coarse = solve_bvp(mesh_coarse)
-
-        # Then refine ALL elements of new coarse to get new fine (for error estimation)
-        marked_all = np.arange(mesh_coarse.noelms)
-        mesh_fine, parent_map = refine(mesh_coarse, marked_all)
-        u_fine = solve_bvp(mesh_fine)
-
-        iteration += 1
-
-    return mesh_coarse, u_coarse, stats
+def Driver28c(
+    x0: float,
+    y0: float,
+    L1: float,
+    L2: float,
+    noelms1: int,
+    noelms2: int,
+    lam1: float,
+    lam2: float,
+    fun: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+    qt: Callable[[NDArray[np.float64], NDArray[np.float64]], NDArray[np.float64]],
+) -> tuple[
+    NDArray[np.float64], NDArray[np.float64], NDArray[np.int64], NDArray[np.float64]
+]:
+    """28c: Full domain with pure Dirichlet BCs on all boundaries."""
+    mesh = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=noelms1, noelms2=noelms2)
+    U = solve_dirichlet_bc_2d(mesh, qt, fun, lam1=lam1, lam2=lam2)
+    return mesh.VX, mesh.VY, mesh.EToV - 1, U
