@@ -1,0 +1,7 @@
+Re: 100.0
+dt: 0.001
+n_steps: 5000
+print_every: 100
+steady_tol: 1e-6
+type: "imex"
+linear_solver: "lu"

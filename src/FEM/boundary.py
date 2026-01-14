@@ -8,14 +8,38 @@ from .datastructures import BOUNDARY_TOL, Mesh2d
 
 
 def get_boundary_nodes(mesh: Mesh2d) -> NDArray[np.int64]:
-    """Get all boundary node indices (1-based) for a rectangular mesh."""
-    on_boundary = (
-        (np.abs(mesh.VX - mesh.x0) < BOUNDARY_TOL)
-        | (np.abs(mesh.VX - (mesh.x0 + mesh.L1)) < BOUNDARY_TOL)
-        | (np.abs(mesh.VY - mesh.y0) < BOUNDARY_TOL)
-        | (np.abs(mesh.VY - (mesh.y0 + mesh.L2)) < BOUNDARY_TOL)
-    )
-    return np.where(on_boundary)[0] + 1
+    """Get all boundary node indices (1-based) from mesh boundary edges."""
+    if len(mesh.boundary_edges) == 0:
+        return np.array([], dtype=np.int64)
+
+    # boundary_edges is (N, 2) [elem_idx (1-based), edge_local_idx (1-3)]
+    # EDGE_VERTICES maps edge_idx (0-2) to vertex indices (0-2)
+    # EDGE_VERTICES = [[0, 1], [1, 2], [2, 0]]
+    
+    # Vectorized lookup
+    elems = mesh.boundary_edges[:, 0] - 1  # 0-based element indices
+    edges = mesh.boundary_edges[:, 1] - 1  # 0-based edge indices
+    
+    # Get all 3 vertices for the boundary elements
+    # Shape (N, 3)
+    elem_nodes = mesh.EToV[elems]
+    
+    # We need to pick the 2 vertices corresponding to the edge
+    # Construct indices arrays
+    from .datastructures import EDGE_VERTICES
+    
+    # Map edge index to vertex indices
+    v1_local = EDGE_VERTICES[edges, 0]
+    v2_local = EDGE_VERTICES[edges, 1]
+    
+    # Extract global node indices (1-based from EToV)
+    # Use advanced indexing: elem_nodes[row_indices, col_indices]
+    n1 = elem_nodes[np.arange(len(elems)), v1_local]
+    n2 = elem_nodes[np.arange(len(elems)), v2_local]
+    
+    # Combine and find unique
+    all_bnodes = np.concatenate([n1, n2])
+    return np.unique(all_bnodes)
 
 
 def get_boundary_edges(

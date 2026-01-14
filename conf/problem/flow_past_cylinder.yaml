@@ -1,0 +1,12 @@
+name: flow_past_cylinder
+u_mean: 1.0
+BC:
+  # Tags must match the mesh file (see inspect_mesh.py output)
+  # Inlet (Tag 2): Handled via code (parabolic profile)
+  # Outlet (Tag 3): Natural BC (psi free, omega free)
+  # Walls (Tag 4): No-slip
+  # Cylinder (Tag 5): No-slip
+  inlet_tag: 2
+  outlet_tag: 3
+  walls_tag: 4
+  cylinder_tag: 5

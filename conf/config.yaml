@@ -1,0 +1,14 @@
+defaults:
+  - problem: lid_driven_cavity
+  - solver: default
+  - mesh: unit_square
+  - _self_
+
+hydra:
+  run:
+    dir: outputs/${problem.name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/${problem.name}/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: true

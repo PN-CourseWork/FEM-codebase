@@ -1,0 +1,3 @@
+type: unit_square
+N: 32 # Elements per side
+L: 1.0

@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
 
-# Boundary side constants
+if TYPE_CHECKING:
+    import meshio
+
+# Boundary side constants (Generic)
 LEFT, RIGHT, BOTTOM, TOP = 0, 1, 2, 3
+
+# Boundary side constants (Cylinder Benchmark)
+INLET = 2
+OUTLET = 3
+WALLS = 4
+CYLINDER = 5
 
 # Tolerance for boundary node detection (floating-point comparison)
 BOUNDARY_TOL = 1e-10
@@ -204,6 +215,177 @@ class Mesh2d:
         self.abc[:, 2, 0] = x1 * y2 - x2 * y1
         self.abc[:, 2, 1] = y1 - y2
         self.abc[:, 2, 2] = x2 - x1
+
+    @classmethod
+    def from_meshio(
+        cls,
+        mesh: meshio.Mesh | str | Path,
+        tol: float = BOUNDARY_TOL,
+    ) -> Mesh2d:
+        """
+        Create Mesh2d from a meshio mesh or mesh file.
+
+        Parameters
+        ----------
+        mesh : meshio.Mesh or str or Path
+            Either a meshio Mesh object or path to a mesh file.
+        tol : float
+            Tolerance for boundary node detection.
+
+        Returns
+        -------
+        Mesh2d
+            The mesh object with all computed properties.
+        """
+        import meshio as mio
+
+        if isinstance(mesh, (str, Path)):
+            mesh = mio.read(mesh)
+
+        # Extract points (2D only)
+        points = mesh.points[:, :2]
+        VX = points[:, 0].astype(np.float64)
+        VY = points[:, 1].astype(np.float64)
+
+        # Extract triangles (find triangle cells)
+        EToV = None
+        for cell_block in mesh.cells:
+            if cell_block.type == "triangle":
+                EToV = cell_block.data.astype(np.int64) + 1  # 1-based indexing
+                break
+
+        if EToV is None:
+            raise ValueError("No triangle cells found in mesh")
+
+        # Compute bounding box
+        x0, y0 = float(VX.min()), float(VY.min())
+        x1, y1 = float(VX.max()), float(VY.max())
+        L1, L2 = x1 - x0, y1 - y0
+
+        # Estimate noelms1, noelms2 from mesh size
+        avg_elem_area = np.abs(L1 * L2) / len(EToV)
+        avg_elem_size = np.sqrt(2 * avg_elem_area)  # approximate edge length
+        noelms1 = max(1, int(round(L1 / avg_elem_size)))
+        noelms2 = max(1, int(round(L2 / avg_elem_size)))
+
+        # Create instance without calling __post_init__
+        instance = object.__new__(cls)
+        instance.x0 = x0
+        instance.y0 = y0
+        instance.L1 = L1
+        instance.L2 = L2
+        instance.noelms1 = noelms1
+        instance.noelms2 = noelms2
+        instance.VX = VX
+        instance.VY = VY
+        instance.EToV = EToV
+        instance.noelms = len(EToV)
+        instance.nonodes = len(VX)
+        instance.nonodes1 = noelms1 + 1
+        instance.nonodes2 = noelms2 + 1
+
+        # Compute derived properties
+        instance._compute_assembly_indices()
+        
+        # Check for physical tags (line elements)
+        has_tags = False
+        line_cells = None
+        line_tags = None
+        
+        if "line" in mesh.cells_dict:
+            line_cells = mesh.cells_dict["line"]
+            # Check for tags in cell_data
+            # meshio typically stores them under "gmsh:physical"
+            if "gmsh:physical" in mesh.cell_data_dict:
+                 if "line" in mesh.cell_data_dict["gmsh:physical"]:
+                     line_tags = mesh.cell_data_dict["gmsh:physical"]["line"]
+                     has_tags = True
+        
+        if has_tags and line_cells is not None and line_tags is not None:
+            instance._compute_boundary_edges_from_tags(line_cells, line_tags)
+        else:
+            instance._compute_boundary_edges_unstructured(tol)
+            
+        instance._compute_basis()
+
+        return instance
+
+    def _compute_boundary_edges_from_tags(
+        self, 
+        line_cells: NDArray[np.int64], 
+        line_tags: NDArray[np.int64]
+    ) -> None:
+        """
+        Compute boundary edges using physical tags from mesh file.
+        
+        Parameters
+        ----------
+        line_cells : (N, 2) array of node indices (0-based)
+        line_tags : (N,) array of physical tags
+        """
+        # Create a dictionary mapping sorted edge nodes to tag
+        # (min(n1, n2), max(n1, n2)) -> tag
+        edge_to_tag = {}
+        for (n1, n2), tag in zip(line_cells, line_tags):
+            edge = tuple(sorted((n1, n2)))
+            edge_to_tag[edge] = tag
+            
+        boundary_edges_list = []
+        boundary_sides_list = []
+        
+        # Iterate over all elements and find edges that are in the map
+        # This is O(noelms) which is fine
+        for elem_idx in range(self.noelms):
+            elem = elem_idx + 1 # 1-based
+            vertices = self.EToV[elem_idx] - 1 # 0-based node indices
+            
+            for k in range(3): # edges 0, 1, 2
+                va, vb = vertices[EDGE_VERTICES[k]]
+                edge = tuple(sorted((va, vb)))
+                
+                if edge in edge_to_tag:
+                    boundary_edges_list.append([elem, k + 1]) # 1-based edge
+                    boundary_sides_list.append(edge_to_tag[edge])
+                    
+        self.boundary_edges = np.array(boundary_edges_list, dtype=np.int64)
+        self.boundary_sides = np.array(boundary_sides_list, dtype=np.int64)
+
+    def _compute_boundary_edges_unstructured(self, tol: float = BOUNDARY_TOL) -> None:
+        """Compute boundary edges for unstructured mesh by finding edges on domain boundary."""
+        # Find edges that lie on the bounding box
+        x_min, x_max = self.x0, self.x0 + self.L1
+        y_min, y_max = self.y0, self.y0 + self.L2
+
+        boundary_edges_list = []
+        boundary_sides_list = []
+
+        # Edge k connects vertices EDGE_VERTICES[k-1]
+        for elem_idx in range(self.noelms):
+            elem = elem_idx + 1  # 1-based element number
+            vertices = self.EToV[elem_idx]  # 1-based vertex indices
+
+            for k in range(3):  # edges 1, 2, 3 (0-indexed as 0, 1, 2)
+                va, vb = vertices[EDGE_VERTICES[k]]
+                xa, ya = self.VX[va - 1], self.VY[va - 1]
+                xb, yb = self.VX[vb - 1], self.VY[vb - 1]
+
+                # Check if edge is on a boundary
+                side = None
+                if abs(xa - x_min) < tol and abs(xb - x_min) < tol:
+                    side = LEFT
+                elif abs(xa - x_max) < tol and abs(xb - x_max) < tol:
+                    side = RIGHT
+                elif abs(ya - y_min) < tol and abs(yb - y_min) < tol:
+                    side = BOTTOM
+                elif abs(ya - y_max) < tol and abs(yb - y_max) < tol:
+                    side = TOP
+
+                if side is not None:
+                    boundary_edges_list.append([elem, k + 1])  # 1-based edge number
+                    boundary_sides_list.append(side)
+
+        self.boundary_edges = np.array(boundary_edges_list, dtype=np.int64)
+        self.boundary_sides = np.array(boundary_sides_list, dtype=np.int64)
 
     @property
     def vertex_coords(
