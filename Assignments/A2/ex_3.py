@@ -6,7 +6,6 @@ Run pytest tests/test_a2.py::TestEx3Assembly for validation.
 """
 
 import numpy as np
-import scipy as sp
 
 from FEM.datastructures import Mesh2d
 from FEM.assembly import assembly_2d
@@ -22,7 +21,7 @@ def main():
 
     mesh1 = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=3)
     qt1 = np.zeros(mesh1.nonodes)
-    A1, b1 = assembly_2d(mesh1, 1, 1, qt1)
+    A1, b1 = assembly_2d(mesh1, qt1)
 
     print("\nStiffness matrix A:")
     dense = A1.todense(order="C")
@@ -39,7 +38,7 @@ def main():
 
     mesh2 = Mesh2d(x0=-2.5, y0=-4.8, L1=7.6, L2=5.9, noelms1=4, noelms2=3)
     qt2 = -6 * mesh2.VX + 2 * mesh2.VY - 2
-    A2, b2 = assembly_2d(mesh2, 1, 1, qt2)
+    A2, b2 = assembly_2d(mesh2, qt2)
 
 
     print(f"b2: {b2}")

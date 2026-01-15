@@ -109,7 +109,7 @@ def main():
     print("\n\nCONVERGENCE ANALYSIS")
     print("-" * 50)
 
-    p_values = range(5, 11)
+    p_values = range(5, 8)
     errors = []
     errors_l2 = []
     h_values = []

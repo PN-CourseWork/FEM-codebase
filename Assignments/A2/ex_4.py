@@ -26,7 +26,7 @@ def main():
 
 
     qt1 = np.zeros(mesh1.nonodes)
-    A1, b1 = assembly_2d(mesh1, 1, 1, qt1)
+    A1, b1 = assembly_2d(mesh1, qt1)
 
     bnodes1 = get_boundary_nodes(mesh1)
     f1 = np.ones(len(bnodes1))
@@ -47,18 +47,11 @@ def main():
 
     mesh2 = Mesh2d(x0=-2.5, y0=-4.8, L1=7.6, L2=5.9, noelms1=4, noelms2=3)
     qt2 = -6 * mesh2.VX + 2 * mesh2.VY - 2
-    A2, b2 = assembly_2d(mesh2, 1, 1, qt2)
+    A2, b2 = assembly_2d(mesh2, qt2)
 
     bnodes2 = get_boundary_nodes(mesh2)
-    f2 = np.array(
-        [
-            mesh2.VX[i - 1] ** 3
-            - mesh2.VX[i - 1] ** 2 * mesh2.VY[i - 1]
-            + mesh2.VY[i - 1] ** 2
-            - 1
-            for i in bnodes2
-        ]
-    )
+    idx = bnodes2 - 1  # Convert to 0-based indices
+    f2 = mesh2.VX[idx] ** 3 - mesh2.VX[idx] ** 2 * mesh2.VY[idx] + mesh2.VY[idx] ** 2 - 1
     A2, b2 = dirbc_2d(bnodes2, f2, A2, b2)
 
     print(f"\n  Mesh: 4x3 elements, {mesh2.nonodes} nodes")

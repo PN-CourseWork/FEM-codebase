@@ -1,9 +1,5 @@
-import numpy as np
-from scipy.sparse.linalg import spsolve
-
 from FEM.datastructures import Mesh2d, LEFT, RIGHT, BOTTOM, TOP
-from FEM.assembly import assembly_2d
-from FEM.boundary import get_boundary_edges, dirbc_2d, neubc_2d
+from FEM.boundary import get_boundary_edges
 
 
 def main():

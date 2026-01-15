@@ -7,28 +7,6 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .datastructures import Mesh2d
 
 
-def _p1_basis_gradients(
-    x1: NDArray[np.float64],
-    y1: NDArray[np.float64],
-    x2: NDArray[np.float64],
-    y2: NDArray[np.float64],
-    x3: NDArray[np.float64],
-    y3: NDArray[np.float64],
-) -> tuple[
-    NDArray[np.float64],
-    NDArray[np.float64],
-    NDArray[np.float64],
-    NDArray[np.float64],
-    NDArray[np.float64],
-    NDArray[np.float64],
-]:
-    """Compute P1 basis function gradients (b_i, c_i coefficients).
-    """
-    b1, b2, b3 = y2 - y3, y3 - y1, y1 - y2
-    c1, c2, c3 = x3 - x2, x1 - x3, x2 - x1
-    return b1, b2, b3, c1, c2, c3
-
-
 def _p1_local_stiffness(
     b1: NDArray[np.float64],
     b2: NDArray[np.float64],
@@ -47,7 +25,7 @@ def _p1_local_stiffness(
     NDArray[np.float64],
     NDArray[np.float64],
 ]:
-    """Compute P1 local stiffness matrix entries"""
+    """Compute P1 local stiffness matrix entries."""
     K11 = (lam1 * b1 * b1 + lam2 * c1 * c1) * inv_4delta
     K12 = (lam1 * b1 * b2 + lam2 * c1 * c2) * inv_4delta
     K13 = (lam1 * b1 * b3 + lam2 * c1 * c3) * inv_4delta
@@ -73,23 +51,33 @@ def _p1_local_load(
 
 def assembly_2d(
     mesh: Mesh2d,
-    lam1: float,
-    lam2: float,
     qt: NDArray[np.float64],
+    lam1: float = 1.0,
+    lam2: float = 1.0,
 ) -> tuple[csr_matrix, NDArray[np.float64]]:
-    """Assemble global stiffness matrix A and load vector b using COO format."""
+    """Assemble global stiffness matrix A and load vector b.
+
+    Args:
+        mesh: The 2D triangular mesh.
+        qt: Source term evaluated at mesh nodes.
+        lam1: Diffusion coefficient in x-direction (default: 1.0).
+        lam2: Diffusion coefficient in y-direction (default: 1.0).
+
+    Returns:
+        Tuple of (A, b) where A is the stiffness matrix and b is the load vector.
+    """
     v1, v2, v3 = mesh._v1, mesh._v2, mesh._v3
-    x1, y1, x2, y2, x3, y3 = mesh.vertex_coords
     noelms = mesh.noelms
 
+    # Use precomputed basis function coefficients from mesh
+    # abc[:, i, 1] = b_i, abc[:, i, 2] = c_i
+    b1, b2, b3 = mesh.abc[:, 0, 1], mesh.abc[:, 1, 1], mesh.abc[:, 2, 1]
+    c1, c2, c3 = mesh.abc[:, 0, 2], mesh.abc[:, 1, 2], mesh.abc[:, 2, 2]
+
     # Reuse precomputed delta from mesh
-    delta = mesh.delta
-    inv_4delta = 1.0 / (4.0 * delta)
+    inv_4delta = 1.0 / (4.0 * mesh.delta)
 
-    # Compute basis gradients (P1-specific)
-    b1, b2, b3, c1, c2, c3 = _p1_basis_gradients(x1, y1, x2, y2, x3, y3)
-
-    # Compute local stiffness entries (P1-specific)
+    # Compute local stiffness entries
     K11, K12, K13, K22, K23, K33 = _p1_local_stiffness(
         b1, b2, b3, c1, c2, c3, inv_4delta, lam1, lam2
     )
@@ -139,8 +127,8 @@ def assembly_2d(
         shape=(mesh.nonodes, mesh.nonodes),
     ))
 
-    # Compute local load contributions (P1-specific)
-    contrib = _p1_local_load(qt[v1], qt[v2], qt[v3], delta)
+    # Compute local load contributions
+    contrib = _p1_local_load(qt[v1], qt[v2], qt[v3], mesh.delta)
 
     # Assemble global load vector using bincount with preallocated arrays
     all_nodes = np.empty(3 * noelms, dtype=np.int64)

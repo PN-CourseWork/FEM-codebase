@@ -12,7 +12,6 @@ LEFT, RIGHT, BOTTOM, TOP = 0, 1, 2, 3
 BOUNDARY_TOL = 1e-10
 
 # Element configuration (P1 triangles)
-N_LOCAL_NODES = 3
 N_VERTICES = 3
 
 # Edge k (1,2,3) connects these vertex positions in EToV
@@ -50,20 +49,15 @@ class Mesh2d:
     boundary_edges: NDArray[np.int64] = field(init=False)
     boundary_sides: NDArray[np.int64] = field(init=False)
 
-    # Internal vertex index arrays
+    # Internal vertex index arrays (0-based indices into VX, VY)
     _v1: NDArray[np.int64] = field(init=False, repr=False)
     _v2: NDArray[np.int64] = field(init=False, repr=False)
     _v3: NDArray[np.int64] = field(init=False, repr=False)
 
-    # CSR assembly pattern (pre-computed for direct CSR construction)
-    _csr_indptr: NDArray[np.int64] = field(init=False, repr=False)
-    _csr_indices: NDArray[np.int64] = field(init=False, repr=False)
-    _csr_data_map: NDArray[np.int64] = field(init=False, repr=False)
-
     def __post_init__(self) -> None:
         self._compute_mesh_properties()
         self._generate_mesh()
-        self._compute_assembly_indices()
+        self._compute_vertex_indices()
         self._compute_boundary_edges()
         self._compute_basis()
 
@@ -100,51 +94,11 @@ class Mesh2d:
         self.EToV[1::2, 1] = LR + 1
         self.EToV[1::2, 2] = UL + 1
 
-    def _compute_assembly_indices(self) -> None:
-        """Compute vertex indices and CSR sparsity pattern for direct assembly. """
+    def _compute_vertex_indices(self) -> None:
+        """Compute 0-based vertex indices for each element."""
         self._v1 = self.EToV[:, 0] - 1
         self._v2 = self.EToV[:, 1] - 1
         self._v3 = self.EToV[:, 2] - 1
-
-        # Build (row, col) pairs for all element matrix entries
-        # For P1: 9 entries per element (3x3 local matrix)
-        nodes = np.empty((self.noelms, N_LOCAL_NODES), dtype=np.int64)
-        nodes[:, 0] = self._v1
-        nodes[:, 1] = self._v2
-        nodes[:, 2] = self._v3
-
-        n = N_LOCAL_NODES
-        rows = np.repeat(nodes, n, axis=1).ravel()
-        cols = np.tile(nodes, n).ravel()
-        n_entries = len(rows)
-
-        # Sort by (row, col) to group duplicates and build CSR structure
-        sort_order = np.lexsort((cols, rows))
-        sorted_rows = rows[sort_order]
-        sorted_cols = cols[sort_order]
-
-        # Find boundaries between unique (row, col) pairs
-        row_diff = np.diff(sorted_rows, prepend=-1)
-        col_diff = np.diff(sorted_cols, prepend=-1)
-        is_new_pair = (row_diff != 0) | (col_diff != 0)
-
-        # Build CSR structure from unique pairs
-        unique_rows = sorted_rows[is_new_pair]
-        unique_cols = sorted_cols[is_new_pair]
-
-        # indptr: cumulative count of entries per row
-        self._csr_indptr = np.zeros(self.nonodes + 1, dtype=np.int64)
-        np.add.at(self._csr_indptr, unique_rows + 1, 1)
-        np.cumsum(self._csr_indptr, out=self._csr_indptr)
-
-        self._csr_indices = unique_cols
-
-        # Map each original entry to its position in CSR data array
-        pair_indices = np.cumsum(is_new_pair) - 1
-
-        # Invert sort to get mapping for original (unsorted) order
-        self._csr_data_map = np.empty(n_entries, dtype=np.int64)
-        self._csr_data_map[sort_order] = pair_indices
 
     def _compute_boundary_edges(self) -> None:
         elems_per_col = 2 * self.noelms2
