@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 
-from .datastructures import Mesh2d, N_LOCAL_NODES
+from .datastructures import Mesh2d
 
 
 def _p1_basis_gradients(
@@ -71,45 +71,16 @@ def _p1_local_load(
     return q_avg * delta / 3
 
 
-def _pack_p1_stiffness_entries(
-    K11: NDArray[np.float64],
-    K12: NDArray[np.float64],
-    K13: NDArray[np.float64],
-    K22: NDArray[np.float64],
-    K23: NDArray[np.float64],
-    K33: NDArray[np.float64],
-) -> NDArray[np.float64]:
-    """Pack P1 local stiffness entries into flat array for assembly.
-
-    Layout: [K11, K12, K13, K21, K22, K23, K31, K32, K33] per element.
-    This ordering matches the (row, col) pairs from mesh assembly indices.
-
-    """
-    noelms = len(K11)
-    n = N_LOCAL_NODES
-    n2 = n * n  # 9 for P1
-    data = np.empty(noelms * n2)
-    data[0::n2] = K11
-    data[1::n2] = K12
-    data[2::n2] = K13
-    data[3::n2] = K12  # Symmetric
-    data[4::n2] = K22
-    data[5::n2] = K23
-    data[6::n2] = K13  # Symmetric
-    data[7::n2] = K23  # Symmetric
-    data[8::n2] = K33
-    return data
-
-
 def assembly_2d(
     mesh: Mesh2d,
     lam1: float,
     lam2: float,
     qt: NDArray[np.float64],
 ) -> tuple[csr_matrix, NDArray[np.float64]]:
-    """Assemble global stiffness matrix A and load vector b. """
+    """Assemble global stiffness matrix A and load vector b using COO format."""
     v1, v2, v3 = mesh._v1, mesh._v2, mesh._v3
     x1, y1, x2, y2, x3, y3 = mesh.vertex_coords
+    noelms = mesh.noelms
 
     # Reuse precomputed delta from mesh
     delta = mesh.delta
@@ -123,27 +94,65 @@ def assembly_2d(
         b1, b2, b3, c1, c2, c3, inv_4delta, lam1, lam2
     )
 
-    # Pack element entries into flat array
-    element_data = _pack_p1_stiffness_entries(K11, K12, K13, K22, K23, K33)
+    # Preallocate COO arrays (9 entries per element for 3x3 local matrix)
+    nnz = 9 * noelms
+    row_indices = np.empty(nnz, dtype=np.int64)
+    col_indices = np.empty(nnz, dtype=np.int64)
+    data = np.empty(nnz, dtype=np.float64)
 
-    # Accumulate into CSR data array using pre-computed mapping
-    # This avoids COO-to-CSR conversion (no sum_duplicates, no sorting)
-    nnz = len(mesh._csr_indices)
-    csr_data = np.zeros(nnz, dtype=np.float64)
-    np.add.at(csr_data, mesh._csr_data_map, element_data)
+    # Fill row indices: [v1, v1, v1, v2, v2, v2, v3, v3, v3] pattern
+    row_indices[0::9] = v1
+    row_indices[1::9] = v1
+    row_indices[2::9] = v1
+    row_indices[3::9] = v2
+    row_indices[4::9] = v2
+    row_indices[5::9] = v2
+    row_indices[6::9] = v3
+    row_indices[7::9] = v3
+    row_indices[8::9] = v3
 
-    # Construct CSR matrix directly from pre-computed structure
-    A = csr_matrix(
-        (csr_data, mesh._csr_indices, mesh._csr_indptr),
+    # Fill col indices: [v1, v2, v3, v1, v2, v3, v1, v2, v3] pattern
+    col_indices[0::9] = v1
+    col_indices[1::9] = v2
+    col_indices[2::9] = v3
+    col_indices[3::9] = v1
+    col_indices[4::9] = v2
+    col_indices[5::9] = v3
+    col_indices[6::9] = v1
+    col_indices[7::9] = v2
+    col_indices[8::9] = v3
+
+    # Fill data: local stiffness entries (symmetric matrix)
+    data[0::9] = K11
+    data[1::9] = K12
+    data[2::9] = K13
+    data[3::9] = K12  # K21 = K12
+    data[4::9] = K22
+    data[5::9] = K23
+    data[6::9] = K13  # K31 = K13
+    data[7::9] = K23  # K32 = K23
+    data[8::9] = K33
+
+    # Create COO matrix and convert to CSR (handles duplicate entries automatically)
+    A = csr_matrix(coo_matrix(
+        (data, (row_indices, col_indices)),
         shape=(mesh.nonodes, mesh.nonodes),
-    )
+    ))
 
     # Compute local load contributions (P1-specific)
     contrib = _p1_local_load(qt[v1], qt[v2], qt[v3], delta)
 
-    # Assemble global load vector using bincount
-    all_nodes = np.concatenate([v1, v2, v3])
-    all_contrib = np.concatenate([contrib, contrib, contrib])
+    # Assemble global load vector using bincount with preallocated arrays
+    all_nodes = np.empty(3 * noelms, dtype=np.int64)
+    all_nodes[0::3] = v1
+    all_nodes[1::3] = v2
+    all_nodes[2::3] = v3
+
+    all_contrib = np.empty(3 * noelms, dtype=np.float64)
+    all_contrib[0::3] = contrib
+    all_contrib[1::3] = contrib
+    all_contrib[2::3] = contrib
+
     b = np.bincount(all_nodes, weights=all_contrib, minlength=mesh.nonodes)
 
     return A, b.astype(np.float64)
