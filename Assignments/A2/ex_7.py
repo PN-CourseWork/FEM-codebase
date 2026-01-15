@@ -108,8 +108,10 @@ def main():
     # ============================================================
     print("\n\nCONVERGENCE ANALYSIS")
     print("-" * 50)
+    #TODO: ex 2.7: ote that un = −ux on the left edge of the boundary and un = −uy on the bottom edge.
 
-    p_values = range(5, 11)
+    #TODO: Is there a mistake in the implementation since we don't get 2.0 convergence???? 
+    p_values = range(5, 8)
     errors = []
     errors_l2 = []
     h_values = []
@@ -159,10 +161,10 @@ def main():
     print(f"\n  Least squares fit (L-inf): E ~ h^{alpha:.2f}")
     print(f"  Least squares fit (L2):    E ~ h^{alpha_l2:.2f}")
 
-    # Convergence plot
+    # Convergence plot with rates in legend
     fig, ax = plt.subplots()
-    ax.loglog(h_values, errors, "o-", label=r"$L^\infty$ error")
-    ax.loglog(h_values, errors_l2, "s-", label=r"$L^2$ error")
+    ax.loglog(h_values, errors, "o-", label=rf"$L^\infty$ error ($\alpha={alpha:.2f}$)")
+    ax.loglog(h_values, errors_l2, "s-", label=rf"$L^2$ error ($\alpha={alpha_l2:.2f}$)")
     ax.loglog(
         h_values,
         errors[0] * (h_values / h_values[0]) ** 2,
@@ -176,7 +178,6 @@ def main():
     ax.legend()
     fig.savefig(output_dir / "case2_convergence.pdf")
     plt.close(fig)
-    #TODO: write Convergence rates on the legends 
 
     # Triplot for Case 2
     mesh2_fine = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=32, noelms2=32)

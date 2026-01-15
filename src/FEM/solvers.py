@@ -39,7 +39,7 @@ def solve_mixed_bc_2d(
 ) -> NDArray[np.float64]:
     """Solve 2D BVP with mixed BCs: Neumann on left/bottom, Dirichlet on right/top."""
     qt = q_tilde_func(mesh.VX, mesh.VY)
-    A, b = assembly_2d(mesh, lam1, lam2, qt)
+    A, b = assembly_2d(mesh, qt, lam1, lam2)
 
     b = _apply_neumann(mesh, b, LEFT, q_left)
     b = _apply_neumann(mesh, b, BOTTOM, q_bottom)
@@ -73,7 +73,7 @@ def solve_dirichlet_bc_2d(
     from .boundary import get_boundary_nodes
 
     qt = q_tilde_func(mesh.VX, mesh.VY)
-    A, b = assembly_2d(mesh, lam1, lam2, qt)
+    A, b = assembly_2d(mesh, qt, lam1, lam2)
 
     bnodes = get_boundary_nodes(mesh)
     f = f_dirichlet(mesh.VX[bnodes - 1], mesh.VY[bnodes - 1])

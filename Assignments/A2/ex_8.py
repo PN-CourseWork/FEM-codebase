@@ -142,8 +142,8 @@ def main():
     ref_line = errors_b[0] * (dofs_ref / dofs_ref[0]) ** (-1)
 
     # L-infinity norm comparison
-    ax1.loglog(dofs_b, errors_b, "s-", label="Mixed (quarter domain)", markersize=8)
-    ax1.loglog(dofs_c, errors_c, "o-", label="Dirichlet (full domain)", markersize=8)
+    ax1.loglog(dofs_b, errors_b, "s-", label="Mixed (quarter domain)")
+    ax1.loglog(dofs_c, errors_c, "o-", label="Dirichlet (full domain)")
     ax1.loglog(dofs_ref, ref_line, "--", color="gray", label=r"$O(\mathrm{DOFs}^{-1})$")
     ax1.set_xlabel("DOFs")
     ax1.set_ylabel(r"$L^\infty$ error")
@@ -177,8 +177,8 @@ def main():
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
     # L-infinity error vs CPU time
-    ax1.loglog(times_b, errors_b, "s-", label="Mixed (quarter domain)", markersize=8)
-    ax1.loglog(times_c, errors_c, "o-", label="Dirichlet (full domain)", markersize=8)
+    ax1.loglog(times_b, errors_b, "s-", label="Mixed (quarter domain)")
+    ax1.loglog(times_c, errors_c, "o-", label="Dirichlet (full domain)")
     ax1.set_xlabel("CPU Time (ms)")
     ax1.set_ylabel(r"$L^\infty$ error")
     ax1.set_title(r"$L^\infty$ Error vs CPU Time")
@@ -186,8 +186,8 @@ def main():
     ax1.grid(True, alpha=0.3)
 
     # L2 error vs CPU time
-    ax2.loglog(times_b, errors_b_l2, "s-", label="Mixed (quarter domain)", markersize=8)
-    ax2.loglog(times_c, errors_c_l2, "o-", label="Dirichlet (full domain)", markersize=8)
+    ax2.loglog(times_b, errors_b_l2, "s-", label="Mixed (quarter domain)")
+    ax2.loglog(times_c, errors_c_l2, "o-", label="Dirichlet (full domain)")
     ax2.set_xlabel("CPU Time (ms)")
     ax2.set_ylabel(r"$L^2$ error")
     ax2.set_title(r"$L^2$ Error vs CPU Time")
@@ -251,23 +251,23 @@ def main():
     tri = Triangulation(mesh_vis.VX, mesh_vis.VY, mesh_vis.EToV - 1)
 
     # Top row: solutions
-    c0 = axes[0, 0].tripcolor(tri, u_dir_vis, shading="gouraud", cmap="RdBu_r")
+    c0 = axes[0, 0].tripcolor(tri, u_dir_vis)
     axes[0, 0].set_title(f"Dirichlet ({dofs_dirichlet} DOFs, h={h_dirichlet:.3f})")
     axes[0, 0].set_aspect("equal")
     plt.colorbar(c0, ax=axes[0, 0])
 
-    c1 = axes[0, 1].tripcolor(tri, u_mixed_vis, shading="gouraud", cmap="RdBu_r")
+    c1 = axes[0, 1].tripcolor(tri, u_mixed_vis)
     axes[0, 1].set_title(f"Mixed + Symmetry ({dofs_quarter} DOFs, h={h_quarter:.3f})")
     axes[0, 1].set_aspect("equal")
     plt.colorbar(c1, ax=axes[0, 1])
 
     # Bottom row: errors
-    c2 = axes[1, 0].tripcolor(tri, err_dirichlet, shading="gouraud", cmap="hot_r")
+    c2 = axes[1, 0].tripcolor(tri, err_dirichlet)
     axes[1, 0].set_title(f"Dirichlet Error (max={np.nanmax(err_dirichlet):.2e})")
     axes[1, 0].set_aspect("equal")
     plt.colorbar(c2, ax=axes[1, 0])
 
-    c3 = axes[1, 1].tripcolor(tri, err_mixed, shading="gouraud", cmap="hot_r")
+    c3 = axes[1, 1].tripcolor(tri, err_mixed)
     axes[1, 1].set_title(f"Mixed Error (max={np.nanmax(err_mixed):.2e})")
     axes[1, 1].set_aspect("equal")
     plt.colorbar(c3, ax=axes[1, 1])
@@ -280,6 +280,7 @@ def main():
     print(f"\n  Plots saved to: {output_dir}")
     print("\nAll even vs odd tests completed!")
 
+#TODO: estimated convergence rates for the few largest amount of DOFs 
 
 if __name__ == "__main__":
     main()
