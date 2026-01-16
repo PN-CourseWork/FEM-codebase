@@ -5,16 +5,12 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
-# Boundary side constants
 LEFT, RIGHT, BOTTOM, TOP = 0, 1, 2, 3
 
-# Tolerance for boundary node detection (floating-point comparison)
 BOUNDARY_TOL = 1e-10
 
-# Element configuration (P1 triangles)
 N_VERTICES = 3
 
-# Edge k (1,2,3) connects these vertex positions in EToV
 EDGE_VERTICES = np.array([[0, 1], [1, 2], [2, 0]])
 
 
@@ -22,7 +18,6 @@ EDGE_VERTICES = np.array([[0, 1], [1, 2], [2, 0]])
 class Mesh2d:
     """2D triangular mesh for P1 finite elements."""
 
-    # Domain parameters (user-provided)
     x0: float
     y0: float
     L1: float
@@ -85,8 +80,7 @@ class Mesh2d:
         UR = UL + self.nonodes2
         LR = UR + 1
 
-        # Pre-allocate and assign directly (faster than column_stack)
-        # EToV uses 0-based indexing (Python convention)
+        # Pre-allocate and assign directly 
         self.EToV = np.empty((self.noelms, 3), dtype=np.int64)
 
         if self.diagonal == "nw_se":
@@ -119,43 +113,41 @@ class Mesh2d:
         self._v3 = self.EToV[:, 2]
 
     def _compute_boundary_edges(self) -> None:
-        # Column-major ordering with upper-first (MATLAB convention)
-        # boundary_edges uses 1-indexed element numbers (for compatibility with boundary.py)
         elems_per_col = 2 * self.noelms2
 
         if self.diagonal == "nw_se":
             # Upper triangle: [UL, LR, UR] - edge 2=right, edge 3=top
             # Lower triangle: [LL, LR, UL] - edge 1=bottom, edge 3=left
 
-            # Left: first column lower triangles (odd indices), edge 3
-            left_elems = np.arange(2, elems_per_col + 1, 2)  # 2, 4, 6, ... (1-indexed)
+            # Left: 
+            left_elems = np.arange(2, elems_per_col + 1, 2)  
             left_edge = 3
-            # Right: last column upper triangles (even indices), edge 2
+            # Right: 
             right_start = (self.noelms1 - 1) * elems_per_col
-            right_elems = right_start + np.arange(1, elems_per_col, 2) + 1  # 1-indexed
+            right_elems = right_start + np.arange(1, elems_per_col, 2) + 1  
             right_edge = 2
-            # Bottom: last row of each column, lower triangles, edge 1
-            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  # 1-indexed
+            # Bottom: 
+            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  
             bottom_edge = 1
-            # Top: first row of each column, upper triangles, edge 3
-            top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
+            # Top: 
+            top_elems = np.arange(self.noelms1) * elems_per_col + 1  
             top_edge = 3
         else:  # sw_ne
             # Left triangle: [UL, LL, UR] - edge 1=left, edge 3=top
             # Right triangle: [LL, LR, UR] - edge 1=bottom, edge 2=right
 
-            # Left: first column left triangles (0-indexed even → 1-indexed odd), edge 1
-            left_elems = np.arange(1, elems_per_col, 2)  # 1, 3, 5, ... (1-indexed)
+            # Left: 
+            left_elems = np.arange(1, elems_per_col, 2)  
             left_edge = 1
-            # Right: last column right triangles (0-indexed odd → 1-indexed even), edge 2
+            # Right: 
             right_start = (self.noelms1 - 1) * elems_per_col
-            right_elems = right_start + np.arange(2, elems_per_col + 1, 2)  # 1-indexed
+            right_elems = right_start + np.arange(2, elems_per_col + 1, 2)  
             right_edge = 2
-            # Bottom: last row right triangles, edge 1 (LL→LR is bottom)
-            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  # 1-indexed
+            # Bottom: 
+            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  
             bottom_edge = 1
-            # Top: first row left triangles, edge 3
-            top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
+            # Top: 
+            top_elems = np.arange(self.noelms1) * elems_per_col + 1  
             top_edge = 3
 
         # Pre-allocate boundary arrays
@@ -193,7 +185,7 @@ class Mesh2d:
 
         self.delta = 0.5 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
 
-        # Pre-allocate abc array (faster than stack + column_stack)
+        # Pre-allocate abc array 
         # Shape: (noelms, 3 basis functions, 3 coefficients [a, b, c])
         self.abc = np.empty((self.noelms, 3, 3), dtype=np.float64)
         # Basis function 1: a1, b1, c1
