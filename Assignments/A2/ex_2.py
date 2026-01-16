@@ -27,8 +27,8 @@ def get(name: str) -> np.ndarray:
 print("Exercise 2.2: Basis Functions and Outer Normals")
 print("=" * 60)
 
-# Test with element n=4 (validation data corresponds to element 4, labeled as 9 in Week 2 solutions)
-n = 4
+# Test with element n=9 (as specified in exercise)
+n = 9
 x0, y0 = -2.5, -4.8
 L1, L2 = 7.6, 5.9
 

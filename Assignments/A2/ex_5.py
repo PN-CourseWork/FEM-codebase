@@ -57,6 +57,11 @@ u_ex1 = u_exact_1(mesh1.VX, mesh1.VY)
 error1 = np.abs(u_h1 - u_ex1)
 E1 = np.max(error1)
 
+# Print solution values in 2-D array format
+u_2d = u_h1.reshape((mesh1.noelms2 + 1, mesh1.noelms1 + 1), order='F')
+print("\n  Solution u_h (2-D format):")
+print(u_2d)
+
 print(f"\n  Max error E (case 1)  = {E1:.6e}")
 
 # ============================================================

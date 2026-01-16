@@ -49,10 +49,10 @@ print("=" * 60)
 # ============================================================
 # Case 1: Unit square, q(x,y) = 0, f(x,y) = 1
 # ============================================================
-print("\nCASE 1: Unit square [0,1]x[0,1], q=0, f=1 on boundary")
+print("\nCASE 1: Unit square [0,1]x[0,1], noelms1=noelms2=4, q=0, f=1")
 print("-" * 60)
 
-mesh1 = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=3)
+mesh1 = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=4)
 qt1 = np.zeros(mesh1.nonodes)
 A1, b1 = assembly_2d(mesh1, qt1)
 
@@ -96,8 +96,7 @@ A2, b2 = assembly_2d(mesh2, qt2)
 
 # Apply Dirichlet BC: u = f(x,y) on all boundary
 bnodes2 = get_boundary_nodes(mesh2)
-idx = bnodes2 - 1  # Convert to 0-based indices
-f2 = mesh2.VX[idx] ** 3 - mesh2.VX[idx] ** 2 * mesh2.VY[idx] + mesh2.VY[idx] ** 2 - 1
+f2 = mesh2.VX[bnodes2] ** 3 - mesh2.VX[bnodes2] ** 2 * mesh2.VY[bnodes2] + mesh2.VY[bnodes2] ** 2 - 1
 A2, b2 = dirbc_2d(bnodes2, f2, A2, b2)
 
 # Expected values

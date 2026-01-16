@@ -44,10 +44,22 @@ def q_bottom(x, y):
 
 
 # ============================================================
-# Program b): Quarter domain [0,1]² with mixed BCs, noelms = 2p
+# Program b): Quarter domain [0,1]² with mixed BCs
 # ============================================================
-print("\nProgram b): Quarter domain [0,1]², noelms = 2p")
+print("\nProgram b): Quarter domain [0,1]², noelms1=noelms2=3")
 print("-" * 60)
+
+# Print solution in 2-D format for noelms=3 (as specified in exercise)
+mesh_b = Mesh2d(x0=0.0, y0=0.0, L1=1.0, L2=1.0, noelms1=3, noelms2=3)
+u_b = solve_mixed_bc_2d(mesh_b, q_tilde, q_left, q_bottom, u_exact)
+u_b_2d = u_b.reshape((mesh_b.noelms2 + 1, mesh_b.noelms1 + 1), order='F')
+print("\n  Solution u_h (2-D format):")
+print(u_b_2d)
+
+# Convergence study
+print("\n  Convergence study (noelms = 2p):")
+print(f"  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'E_inf':<12} {'E_L2':<12}")
+print("  " + "-" * 75)
 
 p_values = range(1, 10)
 errors_b = []
@@ -89,10 +101,22 @@ h_values = np.array(h_values)
 times_b = np.array(times_b)
 
 # ============================================================
-# Program c): Full domain [-1,1]² with Dirichlet BCs, noelms = 2p
+# Program c): Full domain [-1,1]² with Dirichlet BCs
 # ============================================================
-print("\n\nProgram c): Full domain [-1,1]², noelms = 2p (same DOFs)")
+print("\n\nProgram c): Full domain [-1,1]², noelms1=noelms2=6")
 print("-" * 60)
+
+# Print solution in 2-D format for noelms=6 (as specified in exercise)
+mesh_c = Mesh2d(x0=-1.0, y0=-1.0, L1=2.0, L2=2.0, noelms1=6, noelms2=6)
+u_c = solve_dirichlet_bc_2d(mesh_c, q_tilde, u_exact)
+u_c_2d = u_c.reshape((mesh_c.noelms2 + 1, mesh_c.noelms1 + 1), order='F')
+print("\n  Solution u_h (2-D format):")
+print(u_c_2d)
+
+# Convergence study
+print("\n  Convergence study (noelms = 2p, same DOFs as program b):")
+print(f"  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'E_inf':<12} {'E_L2':<12}")
+print("  " + "-" * 75)
 
 errors_c = []
 errors_c_l2 = []
@@ -242,34 +266,44 @@ u_mixed_vis = reconstruct_symmetric(mesh_vis.VX, mesh_vis.VY)
 err_dirichlet = np.abs(u_dir_vis - u_ex_vis)
 err_mixed = np.abs(u_mixed_vis - u_ex_vis)
 
-# Create 2x2 plot
-fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+# Create triangulation for visualization
 tri = Triangulation(mesh_vis.VX, mesh_vis.VY, mesh_vis.EToV)
 
-c0 = axes[0, 0].tripcolor(tri, u_dir_vis)
-axes[0, 0].set_title(f"Dirichlet ({dofs_dirichlet} DOFs, h={h_dirichlet:.3f})")
-axes[0, 0].set_aspect("equal")
-plt.colorbar(c0, ax=axes[0, 0])
+# Plot 1: Solutions
+fig1, axes1 = plt.subplots(1, 2, figsize=(12, 5))
 
-c1 = axes[0, 1].tripcolor(tri, u_mixed_vis)
-axes[0, 1].set_title(f"Mixed + Symmetry ({dofs_quarter} DOFs, h={h_quarter:.3f})")
-axes[0, 1].set_aspect("equal")
-plt.colorbar(c1, ax=axes[0, 1])
+c0 = axes1[0].tripcolor(tri, u_dir_vis)
+axes1[0].set_title(f"Dirichlet ({dofs_dirichlet} DOFs, h={h_dirichlet:.3f})")
+axes1[0].set_aspect("equal")
+plt.colorbar(c0, ax=axes1[0])
 
-c2 = axes[1, 0].tripcolor(tri, err_dirichlet)
-axes[1, 0].set_title(f"Dirichlet Error (max={np.nanmax(err_dirichlet):.2e})")
-axes[1, 0].set_aspect("equal")
-plt.colorbar(c2, ax=axes[1, 0])
+c1 = axes1[1].tripcolor(tri, u_mixed_vis)
+axes1[1].set_title(f"Mixed + Symmetry ({dofs_quarter} DOFs, h={h_quarter:.3f})")
+axes1[1].set_aspect("equal")
+plt.colorbar(c1, ax=axes1[1])
 
-c3 = axes[1, 1].tripcolor(tri, err_mixed)
-axes[1, 1].set_title(f"Mixed Error (max={np.nanmax(err_mixed):.2e})")
-axes[1, 1].set_aspect("equal")
-plt.colorbar(c3, ax=axes[1, 1])
+fig1.suptitle(r"$u = \cos(\pi x)\cos(\pi y)$: Same DOFs, Different $h$")
+fig1.tight_layout()
+fig1.savefig(output_dir / "solution_triplot.pdf")
+plt.close(fig1)
 
-fig.suptitle(r"$u = \cos(\pi x)\cos(\pi y)$: Same DOFs, Different $h$")
-fig.tight_layout()
-fig.savefig(output_dir / "solution_triplot.pdf")
-plt.close(fig)
+# Plot 2: Errors
+fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
+
+c2 = axes2[0].tripcolor(tri, err_dirichlet)
+axes2[0].set_title(f"Dirichlet Error (max={np.nanmax(err_dirichlet):.2e})")
+axes2[0].set_aspect("equal")
+plt.colorbar(c2, ax=axes2[0])
+
+c3 = axes2[1].tripcolor(tri, err_mixed)
+axes2[1].set_title(f"Mixed Error (max={np.nanmax(err_mixed):.2e})")
+axes2[1].set_aspect("equal")
+plt.colorbar(c3, ax=axes2[1])
+
+fig2.suptitle(r"$u = \cos(\pi x)\cos(\pi y)$: Error Comparison")
+fig2.tight_layout()
+fig2.savefig(output_dir / "error_triplot.pdf")
+plt.close(fig2)
 
 print(f"\n  Plots saved to: {output_dir}")
 print("\nAll even vs odd tests completed!")

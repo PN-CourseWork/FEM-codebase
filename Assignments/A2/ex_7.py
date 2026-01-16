@@ -52,6 +52,11 @@ def q_bottom_1(x, _y):
 
 u_h1 = solve_mixed_bc_2d(mesh1, q_tilde_1, q_left_1, q_bottom_1, u_exact_1)
 
+# Print solution in 2-D array format (as specified in exercise)
+u_2d = u_h1.reshape((mesh1.noelms2 + 1, mesh1.noelms1 + 1), order='F')
+print("\n  Solution u_h (2-D format):")
+print(u_2d)
+
 u_ex1 = u_exact_1(mesh1.VX, mesh1.VY)
 E1 = np.max(np.abs(u_h1 - u_ex1))
 print(f"\n  Max error E = {E1:.6e}")
@@ -114,7 +119,7 @@ print(f"\n  Max error E = {E2:.6e}")
 print("\n\nCONVERGENCE ANALYSIS")
 print("-" * 50)
 
-p_values = range(5, 11)
+p_values = range(5, 9)
 errors = []
 errors_l2 = []
 h_values = []

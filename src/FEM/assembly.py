@@ -43,17 +43,16 @@ def _p1_local_load(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """Compute P1 load vector contributions per element.
 
-    Uses exact integration for linear basis functions:
-        integral(q * psi_i) = (delta/12) * (2*q_i + q_j + q_k)
+    Uses average value approximation (MATLAB convention):
+        q_avg = (q_v1 + q_v2 + q_v3) / 3
+        contrib_r = q_avg * delta / 3 = delta/9 * (q_v1 + q_v2 + q_v3)
 
     Returns:
         Tuple of (contrib_v1, contrib_v2, contrib_v3) contributions for each vertex.
     """
-    delta_over_12 = delta / 12
-    contrib_v1 = delta_over_12 * (2 * qt_v1 + qt_v2 + qt_v3)
-    contrib_v2 = delta_over_12 * (qt_v1 + 2 * qt_v2 + qt_v3)
-    contrib_v3 = delta_over_12 * (qt_v1 + qt_v2 + 2 * qt_v3)
-    return contrib_v1, contrib_v2, contrib_v3
+    # Same contribution for all three nodes (average value approximation)
+    contrib = delta / 9 * (qt_v1 + qt_v2 + qt_v3)
+    return contrib, contrib, contrib
 
 
 def assembly_2d(
