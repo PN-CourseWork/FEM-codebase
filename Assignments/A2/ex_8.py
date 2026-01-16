@@ -68,8 +68,8 @@ for diag in diagonals:
     print(u_b_2d)
 
     # Convergence study
-    print(f"\n  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'E_inf':<12}")
-    print("  " + "-" * 60)
+    print(f"\n  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'u(0,0)':<14} {'E_inf':<12}")
+    print("  " + "-" * 75)
 
     errors_b = []
     dofs_b = []
@@ -90,12 +90,15 @@ for diag in diagonals:
         u_ex = u_exact(mesh.VX, mesh.VY)
         E_inf = np.max(np.abs(u_h - u_ex))
 
+        # u(0,0) is at index 0 for quarter domain starting at origin
+        u_00 = u_h[0]
+
         errors_b.append(E_inf)
         dofs_b.append(n_dofs)
         h_values.append(h)
         times_b.append(t_solve)
 
-        print(f"  {p:<4} {noelms:<8} {h:<10.4f} {n_dofs:<8} {t_solve:<12.3f} {E_inf:<12.4e}")
+        print(f"  {p:<4} {noelms:<8} {h:<10.4f} {n_dofs:<8} {t_solve:<12.3f} {u_00:<14.6f} {E_inf:<12.4e}")
 
     # ============================================================
     # Program c): Full domain [-1,1]² with Dirichlet BCs
@@ -110,8 +113,8 @@ for diag in diagonals:
     print("\n  Solution u_h (2-D format):")
     print(u_c_2d)
 
-    print(f"\n  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'E_inf':<12}")
-    print("  " + "-" * 60)
+    print(f"\n  {'p':<4} {'noelms':<8} {'h':<10} {'DOFs':<8} {'Time (ms)':<12} {'u(0,0)':<14} {'E_inf':<12}")
+    print("  " + "-" * 75)
 
     errors_c = []
     dofs_c = []
@@ -131,11 +134,15 @@ for diag in diagonals:
         u_ex = u_exact(mesh.VX, mesh.VY)
         E_inf = np.max(np.abs(u_h - u_ex))
 
+        # Find node at (0,0) - center of the full domain
+        idx_00 = np.argmin(mesh.VX**2 + mesh.VY**2)
+        u_00 = u_h[idx_00]
+
         errors_c.append(E_inf)
         dofs_c.append(n_dofs)
         times_c.append(t_solve)
 
-        print(f"  {p:<4} {noelms:<8} {h:<10.4f} {n_dofs:<8} {t_solve:<12.3f} {E_inf:<12.4e}")
+        print(f"  {p:<4} {noelms:<8} {h:<10.4f} {n_dofs:<8} {t_solve:<12.3f} {u_00:<14.6f} {E_inf:<12.4e}")
 
     # Store results
     results[diag] = {
