@@ -29,7 +29,7 @@ class Mesh2d:
     L2: float
     noelms1: int
     noelms2: int
-    diagonal: str = "ul_lr"  # "ul_lr" or "ll_ur" - direction of triangle split
+    diagonal: str = "nw_se"  # "nw_se" or "sw_ne" - direction of triangle split
 
     # Computed mesh properties
     noelms: int = field(init=False)
@@ -89,7 +89,7 @@ class Mesh2d:
         # EToV uses 0-based indexing (Python convention)
         self.EToV = np.empty((self.noelms, 3), dtype=np.int64)
 
-        if self.diagonal == "ul_lr":
+        if self.diagonal == "nw_se":
             # Diagonal from upper-left to lower-right
             # Upper triangles first (even indices): [UL, LR, UR]
             self.EToV[0::2, 0] = UL
@@ -99,7 +99,7 @@ class Mesh2d:
             self.EToV[1::2, 0] = LL
             self.EToV[1::2, 1] = LR
             self.EToV[1::2, 2] = UL
-        elif self.diagonal == "ll_ur":
+        elif self.diagonal == "sw_ne":
             # Diagonal from lower-left to upper-right
             # Left triangles first (even indices): [UL, LL, UR]
             self.EToV[0::2, 0] = UL
@@ -110,7 +110,7 @@ class Mesh2d:
             self.EToV[1::2, 1] = LR
             self.EToV[1::2, 2] = UR
         else:
-            raise ValueError(f"diagonal must be 'ul_lr' or 'll_ur', got '{self.diagonal}'")
+            raise ValueError(f"diagonal must be 'nw_se' or 'sw_ne', got '{self.diagonal}'")
 
     def _compute_vertex_indices(self) -> None:
         """Cache vertex indices for each element (already 0-based)."""
@@ -123,7 +123,7 @@ class Mesh2d:
         # boundary_edges uses 1-indexed element numbers (for compatibility with boundary.py)
         elems_per_col = 2 * self.noelms2
 
-        if self.diagonal == "ul_lr":
+        if self.diagonal == "nw_se":
             # Upper triangle: [UL, LR, UR] - edge 2=right, edge 3=top
             # Lower triangle: [LL, LR, UL] - edge 1=bottom, edge 3=left
 
@@ -140,20 +140,20 @@ class Mesh2d:
             # Top: first row of each column, upper triangles, edge 3
             top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
             top_edge = 3
-        else:  # ll_ur
-            # Left triangle: [UL, LL, UR] - edge 1=left
-            # Right triangle: [LL, LR, UR] - edge 2=right
+        else:  # sw_ne
+            # Left triangle: [UL, LL, UR] - edge 1=left, edge 3=top
+            # Right triangle: [LL, LR, UR] - edge 1=bottom, edge 2=right
 
-            # Left: first column left triangles (even indices), edge 1
-            left_elems = np.arange(1, elems_per_col, 2) + 1  # 1-indexed
+            # Left: first column left triangles (0-indexed even → 1-indexed odd), edge 1
+            left_elems = np.arange(1, elems_per_col, 2)  # 1, 3, 5, ... (1-indexed)
             left_edge = 1
-            # Right: last column right triangles (odd indices), edge 2
+            # Right: last column right triangles (0-indexed odd → 1-indexed even), edge 2
             right_start = (self.noelms1 - 1) * elems_per_col
             right_elems = right_start + np.arange(2, elems_per_col + 1, 2)  # 1-indexed
             right_edge = 2
-            # Bottom: last row right triangles, edge 2
+            # Bottom: last row right triangles, edge 1 (LL→LR is bottom)
             bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  # 1-indexed
-            bottom_edge = 2
+            bottom_edge = 1
             # Top: first row left triangles, edge 3
             top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
             top_edge = 3

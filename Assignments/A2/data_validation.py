@@ -9,7 +9,7 @@ from pathlib import Path
 
 np.set_printoptions(precision=4, suppress=True, linewidth=120)
 
-data_file = Path(__file__).parent / 'validation_data.parquet'
+data_file = Path('data/A2/validation_data.parquet')
 df = pd.read_parquet(data_file)
 
 

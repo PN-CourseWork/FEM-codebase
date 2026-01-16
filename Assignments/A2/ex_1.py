@@ -1,8 +1,5 @@
 """
 Exercise 2.1: 2D Mesh Generation
-
-Demonstrates mesh generation for triangular elements on rectangular domains.
-Validates against reference solutions from Week 2.
 """
 
 import json
@@ -15,7 +12,7 @@ from FEM.datastructures import Mesh2d
 np.set_printoptions(precision=4, suppress=True, linewidth=120)
 
 # Load validation data
-VALIDATION_FILE = Path(__file__).parent / "validation_data.parquet"
+VALIDATION_FILE = Path("data/A2/validation_data.parquet")
 df = pd.read_parquet(VALIDATION_FILE)
 
 
