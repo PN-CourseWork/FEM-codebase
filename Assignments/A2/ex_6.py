@@ -1,7 +1,5 @@
 """
-Exercise 2.6: Boundary Edge Data Structure
-
-Demonstrates boundary edge identification and retrieval.
+Exercise 2.6
 """
 
 from FEM.datastructures import Mesh2d, LEFT, RIGHT, BOTTOM, TOP
@@ -16,10 +14,10 @@ mesh = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=3)
 # Get all boundary edges
 beds_all = get_boundary_edges(mesh)
 
-print(f"\na) Total boundary edges: {len(beds_all)}")
+print(f"\nTotal boundary edges: {len(beds_all)}")
 
 # Print beds array
-print("\nb) Boundary edge table (beds):")
+print("\nBoundary edge table (beds):")
 print(f"   {'Edge':<6} {'Element':<10} {'Local r':<10}")
 print("   " + "-" * 30)
 for p, (n, r) in enumerate(beds_all):
@@ -32,7 +30,7 @@ beds_top = get_boundary_edges(mesh, TOP)
 beds_bottom = get_boundary_edges(mesh, BOTTOM)
 
 print("\nc) Edges per side:")
-print(f"   Left:   {len(beds_left)} edges (expected: 3)")
-print(f"   Right:  {len(beds_right)} edges (expected: 3)")
-print(f"   Top:    {len(beds_top)} edges (expected: 4)")
-print(f"   Bottom: {len(beds_bottom)} edges (expected: 4)")
+print(f"   Left:   {len(beds_left)} edges")
+print(f"   Right:  {len(beds_right)} edges")
+print(f"   Top:    {len(beds_top)} edges")
+print(f"   Bottom: {len(beds_bottom)} edges")
