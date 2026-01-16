@@ -84,6 +84,8 @@ errors = []
 h_values = []
 
 print("  " + "-" * 45)
+print(f"  {'p':<5} {'noelms':<10} {'h':<15} {'E':<15}")
+print("  " + "-" * 45)
 
 for p in p_values:
     noelms = 2**p
@@ -120,7 +122,6 @@ coeffs = np.polyfit(log_h, log_E, 1)
 alpha = coeffs[0]
 C = np.exp(coeffs[1])
 
-print(f"\n  Least squares fit: E ~ {C:.4f} * h^{alpha:.2f}")
 
 # Plot
 fig, ax = plt.subplots()
