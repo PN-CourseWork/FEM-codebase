@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 import scipy.sparse.linalg as spla
 
 from .assembly import assembly_2d
-from .boundary import dirbc_2d, get_boundary_edges, get_edge_midpoints, neubc_2d
+from .boundary import dirbc_2d, get_boundary_edges, get_edge_endpoints, neubc_2d
 from .datastructures import BOTTOM, BOUNDARY_TOL, LEFT, Mesh2d
 
 
@@ -19,9 +19,10 @@ def _apply_neumann(
 ) -> NDArray[np.float64]:
     """Apply Neumann BC on a boundary side."""
     beds = get_boundary_edges(mesh, side)
-    midpts = get_edge_midpoints(beds, mesh)
-    q = q_func(midpts[:, 0], midpts[:, 1])
-    return neubc_2d(beds, q, mesh, b)
+    pts_i, pts_j = get_edge_endpoints(beds, mesh)
+    q_i = q_func(pts_i[:, 0], pts_i[:, 1])
+    q_j = q_func(pts_j[:, 0], pts_j[:, 1])
+    return neubc_2d(beds, q_i, q_j, mesh, b)
 
 
 def solve_mixed_bc_2d(

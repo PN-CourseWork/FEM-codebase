@@ -40,13 +40,20 @@ def _p1_local_load(
     qt_v2: NDArray[np.float64],
     qt_v3: NDArray[np.float64],
     delta: NDArray[np.float64],
-) -> NDArray[np.float64]:
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """Compute P1 load vector contributions per element.
 
-    Uses centroid evaluation (as defined in 2.3.a in exercises).
+    Uses exact integration for linear basis functions:
+        integral(q * psi_i) = (delta/12) * (2*q_i + q_j + q_k)
+
+    Returns:
+        Tuple of (contrib_v1, contrib_v2, contrib_v3) contributions for each vertex.
     """
-    q_avg = (qt_v1 + qt_v2 + qt_v3) / 3
-    return q_avg * delta / 3
+    delta_over_12 = delta / 12
+    contrib_v1 = delta_over_12 * (2 * qt_v1 + qt_v2 + qt_v3)
+    contrib_v2 = delta_over_12 * (qt_v1 + 2 * qt_v2 + qt_v3)
+    contrib_v3 = delta_over_12 * (qt_v1 + qt_v2 + 2 * qt_v3)
+    return contrib_v1, contrib_v2, contrib_v3
 
 
 def assembly_2d(
@@ -127,8 +134,8 @@ def assembly_2d(
         shape=(mesh.nonodes, mesh.nonodes),
     ))
 
-    # Compute local load contributions
-    contrib = _p1_local_load(qt[v1], qt[v2], qt[v3], mesh.delta)
+    # Compute local load contributions (different for each vertex)
+    contrib_v1, contrib_v2, contrib_v3 = _p1_local_load(qt[v1], qt[v2], qt[v3], mesh.delta)
 
     # Assemble global load vector using bincount with preallocated arrays
     all_nodes = np.empty(3 * noelms, dtype=np.int64)
@@ -137,9 +144,9 @@ def assembly_2d(
     all_nodes[2::3] = v3
 
     all_contrib = np.empty(3 * noelms, dtype=np.float64)
-    all_contrib[0::3] = contrib
-    all_contrib[1::3] = contrib
-    all_contrib[2::3] = contrib
+    all_contrib[0::3] = contrib_v1
+    all_contrib[1::3] = contrib_v2
+    all_contrib[2::3] = contrib_v3
 
     b = np.bincount(all_nodes, weights=all_contrib, minlength=mesh.nonodes)
 
