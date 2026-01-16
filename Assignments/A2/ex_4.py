@@ -11,7 +11,7 @@ from FEM.datastructures import Mesh2d
 from FEM.assembly import assembly_2d
 from FEM.boundary import get_boundary_nodes, dirbc_2d
 
-np.set_printoptions(precision=4, suppress=True, linewidth=120)
+np.set_printoptions(precision=4, suppress=True, linewidth=160)
 
 # Load validation data
 VALIDATION_FILE = Path("data/A2/validation_data.parquet")
@@ -43,54 +43,6 @@ print("Exercise 2.4: Dirichlet Boundary Conditions")
 print("=" * 60)
 
 # ============================================================
-# Case 1: Unit square, q(x,y) = 0, f(x,y) = 1
-# ============================================================
-print("-" * 60)
-print("\nCASE 1:")
-print("-" * 60)
-
-mesh1 = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=4)
-qt1 = np.zeros(mesh1.nonodes)
-A1, b1 = assembly_2d(mesh1, qt1)
-
-# Apply Dirichlet BC: u = 1 on all boundary
-bnodes1 = get_boundary_nodes(mesh1)
-f1 = np.ones(len(bnodes1))
-A1, b1 = dirbc_2d(bnodes1, f1, A1, b1)
-
-# Expected values
-expected_B1 = get('ex24_case1_B')
-expected_d1 = get('ex24_case1_d')
-expected_b1 = get('ex24_case1_b')
-
-# Extract band structure
-B1 = extract_band_matrix(A1, expected_d1)
-
-# EToV 
-print("\nelmtab =")
-print(mesh1.EToV + 1)
-
-
-print("\nB (band matrix after BC) =")
-print(B1)
-
-print("\nb =")
-print(b1)
-
-print("\nA[0:12,0:12] =")
-A1_dense = A1.todense()
-print(A1_dense[0:12, 0:12])
-
-# print
-
-
-# Validate
-B1_match = np.allclose(B1, expected_B1, atol=1e-4)
-b1_match = np.allclose(b1, expected_b1, atol=1e-4)
-
-print(f"\nValidation: B={B1_match}, b={b1_match}")
-
-# ============================================================
 # Case 2: 
 # ============================================================
 print("-" * 60)
@@ -116,8 +68,6 @@ B2 = extract_band_matrix(A2, expected_d2)
 
 print("\nB (band matrix after BC) =")
 print(B2)
-
-print(f"\nd (diagonals) = {expected_d2}")
 
 print("\nb =")
 print(b2)

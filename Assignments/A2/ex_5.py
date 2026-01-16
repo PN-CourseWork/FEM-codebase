@@ -1,7 +1,6 @@
 """
 Exercise 2.5: Dirichlet Problem and Convergence Analysis
 
-Demonstrates solving Poisson equation with Dirichlet BCs and O(h^2) convergence.
 """
 
 import numpy as np
@@ -13,6 +12,7 @@ from FEM.datastructures import Mesh2d
 from FEM.assembly import assembly_2d
 from FEM.boundary import get_boundary_nodes, dirbc_2d
 
+np.set_printoptions(precision=6, suppress=True, linewidth=160)
 # Use custom style
 plt.style.use("src/FEM/fem.mplstyle")
 
@@ -20,13 +20,13 @@ plt.style.use("src/FEM/fem.mplstyle")
 output_dir = Path("figures/A2/ex_5")
 output_dir.mkdir(parents=True, exist_ok=True)
 
-print("Exercise 2.5: Dirichlet Problem and Convergence")
+print("=" * 50)
+print("Exercise 2.5:")
 print("=" * 50)
 
-# ============================================================
-# CASE 1: u(x,y) = x^3 - x^2*y + y^2 - 1
-# ============================================================
-print("\nCASE 1: u(x,y) = x^3 - x^2*y + y^2 - 1")
+# CASE 1: # ============================================================
+print("-" * 50)
+print("\nCASE 1:")
 print("-" * 50)
 
 x0, y0 = -2.5, -4.8
@@ -65,9 +65,9 @@ print(u_2d)
 print(f"\n  Max error E (case 1)  = {E1:.6e}")
 
 # ============================================================
-# CASE 2: u(x,y) = x^2 * y^2 - Convergence Analysis
-# ============================================================
-print("\n\nCASE 2: u(x,y) = x^2 * y^2 - Convergence Analysis")
+# CASE 2:# ============================================================
+print("-" * 50)
+print("\n\nCASE 2")
 print("-" * 50)
 
 
