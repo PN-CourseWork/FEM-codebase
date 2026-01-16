@@ -43,7 +43,7 @@ def _p1_local_load(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """Compute P1 load vector contributions per element.
     """
-    # Same contribution for all three nodes (average value approximation)
+    # Same contribution for all three nodes 
     contrib = delta / 9 * (qt_v1 + qt_v2 + qt_v3)
     return contrib, contrib, contrib
 
@@ -103,11 +103,11 @@ def assembly_2d(
     data[0::9] = K11
     data[1::9] = K12
     data[2::9] = K13
-    data[3::9] = K12  # K21 = K12
+    data[3::9] = K12  
     data[4::9] = K22
     data[5::9] = K23
-    data[6::9] = K13  # K31 = K13
-    data[7::9] = K23  # K32 = K23
+    data[6::9] = K13  
+    data[7::9] = K23  
     data[8::9] = K33
 
     # Create COO matrix and convert to CSR 
