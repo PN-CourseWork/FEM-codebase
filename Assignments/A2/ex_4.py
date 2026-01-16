@@ -1,8 +1,5 @@
 """
-Exercise 2.4: Dirichlet Boundary Conditions
-
-Demonstrates application of Dirichlet BCs to the FEM system.
-Validates against reference solutions from Week 2.
+Exercise 2.4
 """
 
 import json
@@ -29,7 +26,6 @@ def get(name: str) -> np.ndarray:
 def extract_band_matrix(A, expected_d):
     """Extract band matrix B from sparse matrix A matching MATLAB's spdiags format.
 
-    Uses scipy's todia() which has the same convention as MATLAB's spdiags.
     """
     A_dia = A.todia()
     d_list = list(A_dia.offsets)
@@ -49,7 +45,8 @@ print("=" * 60)
 # ============================================================
 # Case 1: Unit square, q(x,y) = 0, f(x,y) = 1
 # ============================================================
-print("\nCASE 1: Unit square [0,1]x[0,1], noelms1=noelms2=4, q=0, f=1")
+print("-" * 60)
+print("\nCASE 1:")
 print("-" * 60)
 
 mesh1 = Mesh2d(x0=0, y0=0, L1=1, L2=1, noelms1=4, noelms2=4)
@@ -69,13 +66,23 @@ expected_b1 = get('ex24_case1_b')
 # Extract band structure
 B1 = extract_band_matrix(A1, expected_d1)
 
+# EToV 
+print("\nelmtab =")
+print(mesh1.EToV + 1)
+
+
 print("\nB (band matrix after BC) =")
 print(B1)
 
-print(f"\nd (diagonals) = {expected_d1}")
-
 print("\nb =")
 print(b1)
+
+print("\nA[0:12,0:12] =")
+A1_dense = A1.todense()
+print(A1_dense[0:12, 0:12])
+
+# print
+
 
 # Validate
 B1_match = np.allclose(B1, expected_B1, atol=1e-4)
@@ -84,10 +91,10 @@ b1_match = np.allclose(b1, expected_b1, atol=1e-4)
 print(f"\nValidation: B={B1_match}, b={b1_match}")
 
 # ============================================================
-# Case 2: Scaled domain, q = -6x+2y-2, f = x^3 - x^2*y + y^2 - 1
+# Case 2: 
 # ============================================================
-print("\n\nCASE 2: Domain [-2.5,5.1]x[-4.8,1.1]")
-print("        q = -6x+2y-2, f = x^3 - x^2*y + y^2 - 1")
+print("-" * 60)
+print("\n\nCASE 2")
 print("-" * 60)
 
 mesh2 = Mesh2d(x0=-2.5, y0=-4.8, L1=7.6, L2=5.9, noelms1=4, noelms2=3)
@@ -120,8 +127,4 @@ B2_match = np.allclose(B2, expected_B2, atol=1e-4)
 b2_match = np.allclose(b2, expected_b2, atol=1e-4)
 
 print(f"\nValidation: B={B2_match}, b={b2_match}")
-if not b2_match:
-    print("  (b vector differs due to source term integration convention)")
 
-# Summary - key validation is stiffness matrix B after BC
-print(f"\n{'='*60}\nKey validation (B after Dirichlet BC): Case1={B1_match}, Case2={B2_match}")
