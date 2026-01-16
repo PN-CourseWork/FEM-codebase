@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix
 
 from .datastructures import Mesh2d
 
@@ -110,11 +110,11 @@ def assembly_2d(
     data[7::9] = K23  
     data[8::9] = K33
 
-    # Create COO matrix and convert to CSR 
-    A = csr_matrix(coo_matrix(
+    # Create CSR matrix directly from COO-style input
+    A = csr_matrix(
         (data, (row_indices, col_indices)),
         shape=(mesh.nonodes, mesh.nonodes),
-    ))
+    )
 
     # Compute local load contributions 
     contrib_v1, contrib_v2, contrib_v3 = _p1_local_load(qt[v1], qt[v2], qt[v3], mesh.delta)

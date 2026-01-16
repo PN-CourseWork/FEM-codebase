@@ -35,9 +35,6 @@ def dirbc_2d(
     b: NDArray[np.float64],
 ) -> tuple[spmatrix, NDArray[np.float64]]:
     """Impose Dirichlet BCs by modifying matrix A and vector b. (Algorithm 6)
-
-    Args:
-        bnodes: Boundary node indices (0-based)
     """
     n = A.shape[0]
     A_csr = A.tocsr()
@@ -97,20 +94,6 @@ def neubc_2d(
     b: NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Impose Neumann BCs by updating the load vector. (Algorithm 8 in lecture notes)
-
-    Uses exact integration for linear basis functions:
-        integral(q * psi_i) = (L/6) * [2*q_i + q_j]
-        integral(q * psi_j) = (L/6) * [q_i + 2*q_j]
-
-    Args:
-        beds: Boundary edges array (element number, local edge number)
-        q_i: Neumann BC values at first node of each edge
-        q_j: Neumann BC values at second node of each edge
-        mesh: The mesh object
-        b: Load vector to update
-
-    Returns:
-        Updated load vector
     """
     i, j, xi, yi, xj, yj = _get_edge_coords(beds, mesh)
     if i is None:
@@ -133,10 +116,6 @@ def get_edge_endpoints(
     mesh: Mesh2d,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Get endpoint coordinates for each boundary edge.
-
-    Returns:
-        Tuple of (endpoints_i, endpoints_j) where each is shape (n_edges, 2)
-        containing (x, y) coordinates for the first and second node of each edge.
     """
     i, j, xi, yi, xj, yj = _get_edge_coords(beds, mesh)
     if i is None:
@@ -162,7 +141,7 @@ def get_edge_midpoints(
     i, j, xi, yi, xj, yj = _get_edge_coords(beds, mesh)
     if i is None:
         return np.empty((0, 2))
-    # Pre-allocate result (faster than column_stack)
+    # Pre-allocate result 
     midpoints = np.empty((len(beds), 2), dtype=np.float64)
     midpoints[:, 0] = (xi + xj) / 2
     midpoints[:, 1] = (yi + yj) / 2
