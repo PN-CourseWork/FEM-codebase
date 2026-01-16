@@ -26,6 +26,7 @@ dependencies = [
   "snakeviz>=2.2.2",
   "line-profiler>=5.0.0",
   "ipykernel>=7.1.0",
+  "pyarrow>=22.0.0",
 ]
 
 [tool.setuptools]
