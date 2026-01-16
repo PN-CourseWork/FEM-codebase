@@ -48,8 +48,7 @@ qt1 = q_1(mesh1.VX, mesh1.VY)
 A1, b1 = assembly_2d(mesh1, qt1)
 
 bnodes1 = get_boundary_nodes(mesh1)
-idx1 = bnodes1 - 1  # Convert to 0-based indices
-f1 = u_exact_1(mesh1.VX[idx1], mesh1.VY[idx1])
+f1 = u_exact_1(mesh1.VX[bnodes1], mesh1.VY[bnodes1])
 A1, b1 = dirbc_2d(bnodes1, f1, A1, b1)
 
 u_h1 = spsolve(A1, b1)
@@ -90,8 +89,7 @@ for p in p_values:
     A, b = assembly_2d(mesh, qt)
 
     bnodes = get_boundary_nodes(mesh)
-    idx = bnodes - 1  # Convert to 0-based indices
-    f = u_exact_2(mesh.VX[idx], mesh.VY[idx])
+    f = u_exact_2(mesh.VX[bnodes], mesh.VY[bnodes])
     A, b = dirbc_2d(bnodes, f, A, b)
 
     u_h = spsolve(A, b)

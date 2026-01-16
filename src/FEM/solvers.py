@@ -45,18 +45,12 @@ def solve_mixed_bc_2d(
     b = _apply_neumann(mesh, b, LEFT, q_left)
     b = _apply_neumann(mesh, b, BOTTOM, q_bottom)
 
-    right_nodes = np.where(np.abs(mesh.VX - (mesh.x0 + mesh.L1)) < BOUNDARY_TOL)[0] + 1
-    top_nodes = np.where(np.abs(mesh.VY - (mesh.y0 + mesh.L2)) < BOUNDARY_TOL)[0] + 1
+    right_nodes = np.where(np.abs(mesh.VX - (mesh.x0 + mesh.L1)) < BOUNDARY_TOL)[0]
+    top_nodes = np.where(np.abs(mesh.VY - (mesh.y0 + mesh.L2)) < BOUNDARY_TOL)[0]
     gamma2_nodes = np.unique(np.concatenate([right_nodes, top_nodes]))
-    f = f_dirichlet(mesh.VX[gamma2_nodes - 1], mesh.VY[gamma2_nodes - 1])
+    f = f_dirichlet(mesh.VX[gamma2_nodes], mesh.VY[gamma2_nodes])
 
     A, b = dirbc_2d(gamma2_nodes, f, A, b)
-    # Use CG for large systems (SPD after Dirichlet BC), direct for small
-    if mesh.nonodes > 10000:
-        x, info = spla.cg(A, b, atol=1e-12)
-        if info != 0:
-            raise RuntimeError(f"CG solver failed with info={info}")
-        return x
     return spla.spsolve(A, b)
 
 
@@ -83,15 +77,9 @@ def solve_dirichlet_bc_2d(
     A, b = assembly_2d(mesh, qt, lam1, lam2)
 
     bnodes = get_boundary_nodes(mesh)
-    f = f_dirichlet(mesh.VX[bnodes - 1], mesh.VY[bnodes - 1])
+    f = f_dirichlet(mesh.VX[bnodes], mesh.VY[bnodes])
 
     A, b = dirbc_2d(bnodes, f, A, b)
-    # Use CG for large systems (SPD after Dirichlet BC), direct for small
-    if mesh.nonodes > 10000:
-        x, info = spla.cg(A, b, atol=1e-12)
-        if info != 0:
-            raise RuntimeError(f"CG solver failed with info={info}")
-        return x
     return spla.spsolve(A, b)
 
 

@@ -8,14 +8,14 @@ from .datastructures import BOUNDARY_TOL, Mesh2d
 
 
 def get_boundary_nodes(mesh: Mesh2d) -> NDArray[np.int64]:
-    """Get all boundary node indices (1-based) for a rectangular mesh."""
+    """Get all boundary node indices (0-based) for a rectangular mesh."""
     on_boundary = (
         (np.abs(mesh.VX - mesh.x0) < BOUNDARY_TOL)
         | (np.abs(mesh.VX - (mesh.x0 + mesh.L1)) < BOUNDARY_TOL)
         | (np.abs(mesh.VY - mesh.y0) < BOUNDARY_TOL)
         | (np.abs(mesh.VY - (mesh.y0 + mesh.L2)) < BOUNDARY_TOL)
     )
-    return np.where(on_boundary)[0] + 1
+    return np.where(on_boundary)[0]
 
 
 def get_boundary_edges(
@@ -34,20 +34,23 @@ def dirbc_2d(
     A: spmatrix,
     b: NDArray[np.float64],
 ) -> tuple[spmatrix, NDArray[np.float64]]:
-    """Impose Dirichlet BCs by modifying matrix A and vector b. (Algorithm 6)"""
-    bnodes_0 = bnodes - 1
+    """Impose Dirichlet BCs by modifying matrix A and vector b. (Algorithm 6)
+
+    Args:
+        bnodes: Boundary node indices (0-based)
+    """
     n = A.shape[0]
     A_csr = A.tocsr()
 
     # A[:, bnodes] @ f == A @ f_full where f_full is zero except at bnodes
     f_full = np.zeros(n)
-    f_full[bnodes_0] = f
+    f_full[bnodes] = f
     b -= A_csr @ f_full
-    b[bnodes_0] = f
+    b[bnodes] = f
 
     # Zero boundary rows/cols and set diagonal to 1
     scale = np.ones(n)
-    scale[bnodes_0] = 0
+    scale[bnodes] = 0
 
     row_scale = np.repeat(scale, np.diff(A_csr.indptr))
     col_scale = scale[A_csr.indices]

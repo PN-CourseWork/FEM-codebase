@@ -29,6 +29,7 @@ class Mesh2d:
     L2: float
     noelms1: int
     noelms2: int
+    diagonal: str = "ul_lr"  # "ul_lr" or "ll_ur" - direction of triangle split
 
     # Computed mesh properties
     noelms: int = field(init=False)
@@ -75,6 +76,7 @@ class Mesh2d:
         self.VX = XX.flatten(order="F")
         self.VY = YY.flatten(order="F")
 
+        # Column-major element ordering with upper-first (MATLAB convention)
         col, row = np.meshgrid(np.arange(self.noelms1), np.arange(self.noelms2))
         col, row = col.flatten(order="F"), row.flatten(order="F")
 
@@ -86,14 +88,29 @@ class Mesh2d:
         # Pre-allocate and assign directly (faster than column_stack)
         # EToV uses 0-based indexing (Python convention)
         self.EToV = np.empty((self.noelms, 3), dtype=np.int64)
-        # Upper triangles: [UL, LR, UR]
-        self.EToV[0::2, 0] = UL
-        self.EToV[0::2, 1] = LR
-        self.EToV[0::2, 2] = UR
-        # Lower triangles: [LL, LR, UL]
-        self.EToV[1::2, 0] = LL
-        self.EToV[1::2, 1] = LR
-        self.EToV[1::2, 2] = UL
+
+        if self.diagonal == "ul_lr":
+            # Diagonal from upper-left to lower-right
+            # Upper triangles first (even indices): [UL, LR, UR]
+            self.EToV[0::2, 0] = UL
+            self.EToV[0::2, 1] = LR
+            self.EToV[0::2, 2] = UR
+            # Lower triangles (odd indices): [LL, LR, UL]
+            self.EToV[1::2, 0] = LL
+            self.EToV[1::2, 1] = LR
+            self.EToV[1::2, 2] = UL
+        elif self.diagonal == "ll_ur":
+            # Diagonal from lower-left to upper-right
+            # Left triangles first (even indices): [UL, LL, UR]
+            self.EToV[0::2, 0] = UL
+            self.EToV[0::2, 1] = LL
+            self.EToV[0::2, 2] = UR
+            # Right triangles (odd indices): [LL, LR, UR]
+            self.EToV[1::2, 0] = LL
+            self.EToV[1::2, 1] = LR
+            self.EToV[1::2, 2] = UR
+        else:
+            raise ValueError(f"diagonal must be 'ul_lr' or 'll_ur', got '{self.diagonal}'")
 
     def _compute_vertex_indices(self) -> None:
         """Cache vertex indices for each element (already 0-based)."""
@@ -102,14 +119,46 @@ class Mesh2d:
         self._v3 = self.EToV[:, 2]
 
     def _compute_boundary_edges(self) -> None:
+        # Column-major ordering with upper-first (MATLAB convention)
+        # boundary_edges uses 1-indexed element numbers (for compatibility with boundary.py)
         elems_per_col = 2 * self.noelms2
-        left_elems = np.arange(2, 2 * self.noelms2 + 1, 2)
-        right_start = (self.noelms1 - 1) * elems_per_col + 1
-        right_elems = np.arange(right_start, right_start + elems_per_col, 2)
-        bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col
-        top_elems = 1 + np.arange(self.noelms1) * elems_per_col
 
-        # Pre-allocate boundary arrays 
+        if self.diagonal == "ul_lr":
+            # Upper triangle: [UL, LR, UR] - edge 2=right, edge 3=top
+            # Lower triangle: [LL, LR, UL] - edge 1=bottom, edge 3=left
+
+            # Left: first column lower triangles (odd indices), edge 3
+            left_elems = np.arange(2, elems_per_col + 1, 2)  # 2, 4, 6, ... (1-indexed)
+            left_edge = 3
+            # Right: last column upper triangles (even indices), edge 2
+            right_start = (self.noelms1 - 1) * elems_per_col
+            right_elems = right_start + np.arange(1, elems_per_col, 2) + 1  # 1-indexed
+            right_edge = 2
+            # Bottom: last row of each column, lower triangles, edge 1
+            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  # 1-indexed
+            bottom_edge = 1
+            # Top: first row of each column, upper triangles, edge 3
+            top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
+            top_edge = 3
+        else:  # ll_ur
+            # Left triangle: [UL, LL, UR] - edge 1=left
+            # Right triangle: [LL, LR, UR] - edge 2=right
+
+            # Left: first column left triangles (even indices), edge 1
+            left_elems = np.arange(1, elems_per_col, 2) + 1  # 1-indexed
+            left_edge = 1
+            # Right: last column right triangles (odd indices), edge 2
+            right_start = (self.noelms1 - 1) * elems_per_col
+            right_elems = right_start + np.arange(2, elems_per_col + 1, 2)  # 1-indexed
+            right_edge = 2
+            # Bottom: last row right triangles, edge 2
+            bottom_elems = np.arange(1, self.noelms1 + 1) * elems_per_col  # 1-indexed
+            bottom_edge = 2
+            # Top: first row left triangles, edge 3
+            top_elems = np.arange(self.noelms1) * elems_per_col + 1  # 1-indexed
+            top_edge = 3
+
+        # Pre-allocate boundary arrays
         n_boundary = 2 * (self.noelms1 + self.noelms2)
         self.boundary_edges = np.empty((n_boundary, 2), dtype=np.int64)
         self.boundary_sides = np.empty(n_boundary, dtype=np.int64)
@@ -119,23 +168,23 @@ class Mesh2d:
         # Left side
         n = self.noelms2
         self.boundary_edges[i:i+n, 0] = left_elems
-        self.boundary_edges[i:i+n, 1] = 3
+        self.boundary_edges[i:i+n, 1] = left_edge
         self.boundary_sides[i:i+n] = LEFT
         i += n
         # Right side
         self.boundary_edges[i:i+n, 0] = right_elems
-        self.boundary_edges[i:i+n, 1] = 2
+        self.boundary_edges[i:i+n, 1] = right_edge
         self.boundary_sides[i:i+n] = RIGHT
         i += n
         # Bottom side
         n = self.noelms1
         self.boundary_edges[i:i+n, 0] = bottom_elems
-        self.boundary_edges[i:i+n, 1] = 1
+        self.boundary_edges[i:i+n, 1] = bottom_edge
         self.boundary_sides[i:i+n] = BOTTOM
         i += n
         # Top side
         self.boundary_edges[i:i+n, 0] = top_elems
-        self.boundary_edges[i:i+n, 1] = 3
+        self.boundary_edges[i:i+n, 1] = top_edge
         self.boundary_sides[i:i+n] = TOP
 
     def _compute_basis(self) -> None:
