@@ -128,7 +128,7 @@ ax.loglog(h_values, errors, "o-", label="Computed error")
 ax.loglog(h_values, C * h_values**2, "--", label=r"$O(h^2)$ reference")
 ax.set_xlabel("h (max element edge length)")
 ax.set_ylabel("E (max error)")
-ax.set_title(r"FEM Error Convergence for $u(x,y) = x^2 y^2$")
+
 ax.legend()
 fig.savefig(output_dir / "convergence_plot.pdf")
 plt.close(fig)

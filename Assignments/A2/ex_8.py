@@ -218,7 +218,7 @@ ax2.set_title(r"$L^\infty$ Error vs CPU Time")
 ax2.legend(fontsize='small')
 ax2.grid(True, alpha=0.3)
 
-fig.suptitle("Performance Comparison: Split Type and BCs")
+
 fig.tight_layout()
 fig.savefig(output_dir / "convergence_combined.pdf")
 plt.close(fig)
@@ -279,7 +279,7 @@ for diag in diagonals:
     axes1[1].set_aspect("equal")
     plt.colorbar(c1, ax=axes1[1])
 
-    fig1.suptitle(rf"$u = \cos(\pi x)\cos(\pi y)$ (diagonal: {diag})")
+
     fig1.tight_layout()
     fig1.savefig(output_dir / f"solution_triplot_{diag}.pdf")
     plt.close(fig1)
@@ -297,7 +297,7 @@ for diag in diagonals:
     axes2[1].set_aspect("equal")
     plt.colorbar(c3, ax=axes2[1])
 
-    fig2.suptitle(rf"Error Comparison (diagonal: {diag})")
+
     fig2.tight_layout()
     fig2.savefig(output_dir / f"error_triplot_{diag}.pdf")
     plt.close(fig2)

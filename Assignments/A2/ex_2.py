@@ -1,8 +1,5 @@
 """
-Exercise 2.2: Basis Functions and Outer Normals
-
-Demonstrates basis function computation for triangular elements.
-Validates against reference solutions from Week 2.
+Exercise 2.2
 """
 
 import json
@@ -15,7 +12,8 @@ from FEM.datastructures import Mesh2d, outernormal
 np.set_printoptions(precision=4, suppress=True, linewidth=120)
 
 # Load validation data
-VALIDATION_FILE = Path("data/A2/validation_data.parquet")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+VALIDATION_FILE = PROJECT_ROOT / "data/A2/validation_data.parquet"
 df = pd.read_parquet(VALIDATION_FILE)
 
 
@@ -24,7 +22,10 @@ def get(name: str) -> np.ndarray:
     return np.array(json.loads(df.loc[name, 'data']))
 
 
-print("Exercise 2.2: Basis Functions and Outer Normals")
+print("=" * 60)
+print("=" * 60)
+print("Exercise 2.2")
+print("=" * 60)
 print("=" * 60)
 
 # Test with element n=9 (as specified in exercise)
@@ -69,7 +70,6 @@ print(f"\n\nPart b) Outer Normals (element n={n})")
 print("-" * 60)
 
 # Compute normals for all 3 faces
-# Note: outernormal takes 0-indexed element number
 n1_computed = outernormal(idx, 1, mesh.VX, mesh.VY, mesh.EToV)
 n2_computed = outernormal(idx, 2, mesh.VX, mesh.VY, mesh.EToV)
 n3_computed = outernormal(idx, 3, mesh.VX, mesh.VY, mesh.EToV)
@@ -85,6 +85,3 @@ n3_match = np.allclose(n3_computed, expected_n3, atol=1e-4)
 
 print(f"\nValidation: n1={n1_match}, n2={n2_match}, n3={n3_match}")
 
-# Summary
-all_passed = delta_match and abc_match and n1_match and n2_match and n3_match
-print(f"\n{'='*60}\nAll tests passed: {all_passed}")

@@ -78,7 +78,7 @@ for diag in ["nw_se", "sw_ne"]:
     axes[2].set_title(rf"Error (max={E1:.2e})")
     plt.colorbar(c2, ax=axes[2])
 
-    fig.suptitle(rf"$u = 3x + 5y - 7$ with Mixed BC (diagonal: {diag})")
+
     fig.tight_layout()
     fig.savefig(output_dir / f"case1_triplot_{diag}.pdf")
     plt.close(fig)
@@ -112,16 +112,21 @@ def q_bottom_2(x, y):
 print("\n\nCONVERGENCE ANALYSIS")
 print("-" * 50)
 
-p_values = range(5, 9)
+p_values = range(3, 9)  # Extended range for better rate calculation
 diagonals = ["nw_se", "sw_ne"]
 results = {}
 
+def calc_rate(h, err):
+    """Calculate convergence rate from last 4 points."""
+    if len(h) < 4:
+        return np.polyfit(np.log(h), np.log(err), 1)[0]
+    return np.polyfit(np.log(h[-4:]), np.log(err[-4:]), 1)[0]
+
 for diag in diagonals:
     print(f"\n  Diagonal: {diag}")
-    print(f"  {'p':<5} {'noelms':<10} {'h':<15} {'E_inf':<15} {'E_L2':<15}")
+    print(f"  {'p':<5} {'noelms':<10} {'h':<15} {'E_inf':<15}")
 
     errors = []
-    errors_l2 = []
     h_values = []
 
     for p in p_values:
@@ -133,59 +138,56 @@ for diag in diagonals:
         u_ex = u_exact_2(mesh.VX, mesh.VY)
 
         E_inf = np.max(np.abs(u_h - u_ex))
-        E_l2 = np.sqrt(np.mean((u_h - u_ex) ** 2))
 
         errors.append(E_inf)
-        errors_l2.append(E_l2)
         h_values.append(h)
 
-        print(f"  {p:<5} {noelms:<10} {h:<15.6f} {E_inf:<15.6e} {E_l2:<15.6e}")
+        print(f"  {p:<5} {noelms:<10} {h:<15.6f} {E_inf:<15.6e}")
 
     errors = np.array(errors)
-    errors_l2 = np.array(errors_l2)
     h_values = np.array(h_values)
 
-    # Compute convergence rate
-    log_h = np.log(h_values)
-    log_E = np.log(errors)
-    alpha = np.polyfit(log_h, log_E, 1)[0]
-    alpha_l2 = np.polyfit(log_h, np.log(errors_l2), 1)[0]
-
-    print(f"  Least squares fit: E_inf ~ h^{alpha:.2f}, E_L2 ~ h^{alpha_l2:.2f}")
+    # Compute convergence rate from last 4 points
+    alpha = calc_rate(h_values, errors)
+    print(f"  Observed rate (last 4 pts): {alpha:.2f}")
 
     results[diag] = {
         "errors": errors,
-        "errors_l2": errors_l2,
         "h_values": h_values,
         "alpha": alpha,
-        "alpha_l2": alpha_l2,
     }
 
 # ============================================================
-# Side-by-side convergence plot
+# Combined convergence plot
 # ============================================================
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig, ax = plt.subplots(figsize=(8, 6))
 
-for ax, diag in zip(axes, diagonals):
+styles = {
+    "nw_se": {"color": "tab:blue", "marker": "o", "ls": "-"},
+    "sw_ne": {"color": "tab:orange", "marker": "s", "ls": "--"},
+}
+
+for diag in diagonals:
     r = results[diag]
-    ax.loglog(r["h_values"], r["errors"], "o-", label=rf"$L^\infty$ ($\alpha={r['alpha']:.2f}$)")
-    ax.loglog(r["h_values"], r["errors_l2"], "s-", label=rf"$L^2$ ($\alpha={r['alpha_l2']:.2f}$)")
-    ax.loglog(
-        r["h_values"],
-        r["errors"][0] * (r["h_values"] / r["h_values"][0]) ** 2,
-        "--",
-        color="gray",
-        label=r"$O(h^2)$ reference",
-    )
-    ax.set_xlabel("h (max element edge length)")
-    ax.set_ylabel("Error")
-    ax.set_title(f"Diagonal: {diag}")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    s = styles[diag]
+    ax.loglog(r["h_values"], r["errors"], 
+               marker=s["marker"], linestyle=s["ls"], color=s["color"],
+               label=rf"Mixed ({diag}) [rate={r['alpha']:.2f}]")
 
-fig.suptitle(r"FEM Convergence for $u = \sin(x)\sin(y)$ (Mixed BC)")
+# Reference O(h^2) line
+r0 = results[diagonals[0]]
+h_ref = np.array([r0["h_values"][0], r0["h_values"][-1]])
+err_ref = r0["errors"][0] * (h_ref / h_ref[0]) ** 2
+ax.loglog(h_ref, err_ref, "k:", alpha=0.5, label=r"$O(h^2)$ reference")
+
+ax.set_xlabel("h (max element edge length)")
+ax.set_ylabel(r"$L^\infty$ error")
+
+ax.legend()
+ax.grid(True, alpha=0.3)
+
 fig.tight_layout()
-fig.savefig(output_dir / "case2_convergence.pdf")
+fig.savefig(output_dir / "case2_convergence_combined.pdf")
 plt.close(fig)
 
 # ============================================================
@@ -211,7 +213,7 @@ for diag in diagonals:
     axes[2].set_title(rf"Error (max={np.max(np.abs(u_h2 - u_ex2)):.2e})")
     plt.colorbar(c2, ax=axes[2])
 
-    fig.suptitle(rf"$u = \sin(x)\sin(y)$ with Mixed BC (diagonal: {diag})")
+
     fig.tight_layout()
     fig.savefig(output_dir / f"case2_triplot_{diag}.pdf")
     plt.close(fig)
