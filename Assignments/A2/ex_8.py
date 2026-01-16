@@ -244,7 +244,7 @@ err_mixed = np.abs(u_mixed_vis - u_ex_vis)
 
 # Create 2x2 plot
 fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-tri = Triangulation(mesh_vis.VX, mesh_vis.VY, mesh_vis.EToV - 1)
+tri = Triangulation(mesh_vis.VX, mesh_vis.VY, mesh_vis.EToV)
 
 c0 = axes[0, 0].tripcolor(tri, u_dir_vis)
 axes[0, 0].set_title(f"Dirichlet ({dofs_dirichlet} DOFs, h={h_dirichlet:.3f})")

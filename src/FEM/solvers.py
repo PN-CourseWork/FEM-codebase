@@ -51,6 +51,12 @@ def solve_mixed_bc_2d(
     f = f_dirichlet(mesh.VX[gamma2_nodes - 1], mesh.VY[gamma2_nodes - 1])
 
     A, b = dirbc_2d(gamma2_nodes, f, A, b)
+    # Use CG for large systems (SPD after Dirichlet BC), direct for small
+    if mesh.nonodes > 10000:
+        x, info = spla.cg(A, b, atol=1e-12)
+        if info != 0:
+            raise RuntimeError(f"CG solver failed with info={info}")
+        return x
     return spla.spsolve(A, b)
 
 
@@ -80,6 +86,12 @@ def solve_dirichlet_bc_2d(
     f = f_dirichlet(mesh.VX[bnodes - 1], mesh.VY[bnodes - 1])
 
     A, b = dirbc_2d(bnodes, f, A, b)
+    # Use CG for large systems (SPD after Dirichlet BC), direct for small
+    if mesh.nonodes > 10000:
+        x, info = spla.cg(A, b, atol=1e-12)
+        if info != 0:
+            raise RuntimeError(f"CG solver failed with info={info}")
+        return x
     return spla.spsolve(A, b)
 
 
@@ -100,7 +112,7 @@ def Driver28b(
     """28b: Quarter domain with mixed BCs (Neumann left/bottom, Dirichlet right/top)."""
     mesh = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=noelms1, noelms2=noelms2)
     U = solve_mixed_bc_2d(mesh, qt, _q_zero, _q_zero, fun, lam1=lam1, lam2=lam2)
-    return mesh.VX, mesh.VY, mesh.EToV - 1, U
+    return mesh.VX, mesh.VY, mesh.EToV, U
 
 
 def Driver28c(
@@ -120,4 +132,4 @@ def Driver28c(
     """28c: Full domain with pure Dirichlet BCs on all boundaries."""
     mesh = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=noelms1, noelms2=noelms2)
     U = solve_dirichlet_bc_2d(mesh, qt, fun, lam1=lam1, lam2=lam2)
-    return mesh.VX, mesh.VY, mesh.EToV - 1, U
+    return mesh.VX, mesh.VY, mesh.EToV, U

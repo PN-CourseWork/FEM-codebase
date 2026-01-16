@@ -48,16 +48,14 @@ print(mesh1.VX)
 print("\ny =")
 print(mesh1.VY)
 
-# Print EToV (convert to 1-indexed for comparison with MATLAB output)
-#TODO: Note in the report that we obviously 0 index instead since we use python! 
-etov_1indexed = mesh1.EToV + 1 if mesh1.EToV.min() == 0 else mesh1.EToV
+# Print EToV (+1 for MATLAB-style 1-indexed display)
 print("\nelmtab =")
-print(etov_1indexed)
+print(mesh1.EToV + 1)
 
-# Validate
+# Validate (expected is 1-indexed from MATLAB solutions)
 vx_match_1 = np.allclose(mesh1.VX, expected_vx_1, atol=1e-4)
 vy_match_1 = np.allclose(mesh1.VY, expected_vy_1, atol=1e-4)
-etov_match_1 = np.array_equal(etov_1indexed, expected_elmtab_1)
+etov_match_1 = np.array_equal(mesh1.EToV + 1, expected_elmtab_1)
 
 print(f"\nValidation: VX={vx_match_1}, VY={vy_match_1}, EToV={etov_match_1}")
 
@@ -84,12 +82,8 @@ print(mesh2.VY)
 vx_match_2 = np.allclose(mesh2.VX, expected_vx_2, atol=1e-4)
 vy_match_2 = np.allclose(mesh2.VY, expected_vy_2, atol=1e-4)
 
-# EToV should be same structure as Case 1 (same noelms1, noelms2)
-etov_2_1indexed = mesh2.EToV + 1 if mesh2.EToV.min() == 0 else mesh2.EToV
-etov_match_2 = np.array_equal(etov_2_1indexed, expected_elmtab_1)
+# EToV same structure as Case 1 (same noelms1, noelms2)
+etov_match_2 = np.array_equal(mesh2.EToV + 1, expected_elmtab_1)
 
 print(f"\nValidation: VX={vx_match_2}, VY={vy_match_2}, EToV={etov_match_2}")
 
-# Summary
-all_passed = vx_match_1 and vy_match_1 and etov_match_1 and vx_match_2 and vy_match_2 and etov_match_2
-print(f"\n{'='*60}\nAll tests passed: {all_passed}")

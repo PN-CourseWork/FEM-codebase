@@ -79,8 +79,9 @@ def _get_edge_coords(
     n, r = beds[:, 0], beds[:, 1]
     s = next_local[r]
 
-    i = mesh.EToV[n - 1, r - 1] - 1
-    j = mesh.EToV[n - 1, s - 1] - 1
+    # EToV is 0-indexed; n-1 because boundary_edges uses 1-indexed element numbers
+    i = mesh.EToV[n - 1, r - 1]
+    j = mesh.EToV[n - 1, s - 1]
 
     return i, j, mesh.VX[i], mesh.VY[i], mesh.VX[j], mesh.VY[j]
 

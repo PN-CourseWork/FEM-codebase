@@ -84,21 +84,22 @@ class Mesh2d:
         LR = UR + 1
 
         # Pre-allocate and assign directly (faster than column_stack)
+        # EToV uses 0-based indexing (Python convention)
         self.EToV = np.empty((self.noelms, 3), dtype=np.int64)
         # Upper triangles: [UL, LR, UR]
-        self.EToV[0::2, 0] = UL + 1
-        self.EToV[0::2, 1] = LR + 1
-        self.EToV[0::2, 2] = UR + 1
+        self.EToV[0::2, 0] = UL
+        self.EToV[0::2, 1] = LR
+        self.EToV[0::2, 2] = UR
         # Lower triangles: [LL, LR, UL]
-        self.EToV[1::2, 0] = LL + 1
-        self.EToV[1::2, 1] = LR + 1
-        self.EToV[1::2, 2] = UL + 1
+        self.EToV[1::2, 0] = LL
+        self.EToV[1::2, 1] = LR
+        self.EToV[1::2, 2] = UL
 
     def _compute_vertex_indices(self) -> None:
-        """Compute 0-based vertex indices for each element."""
-        self._v1 = self.EToV[:, 0] - 1
-        self._v2 = self.EToV[:, 1] - 1
-        self._v3 = self.EToV[:, 2] - 1
+        """Cache vertex indices for each element (already 0-based)."""
+        self._v1 = self.EToV[:, 0]
+        self._v2 = self.EToV[:, 1]
+        self._v3 = self.EToV[:, 2]
 
     def _compute_boundary_edges(self) -> None:
         elems_per_col = 2 * self.noelms2
@@ -188,11 +189,11 @@ def outernormal(
     VY: NDArray[np.float64],
     EToV: NDArray[np.int64],
 ) -> tuple[float, float]:
-    """Compute unit outer normal for element n, edge k."""
-    vertices = EToV[n - 1]
+    """Compute unit outer normal for element n (0-indexed), edge k (1-indexed)."""
+    vertices = EToV[n]
     va, vb = vertices[EDGE_VERTICES[k - 1]]
-    xa, ya = VX[va - 1], VY[va - 1]
-    xb, yb = VX[vb - 1], VY[vb - 1]
+    xa, ya = VX[va], VY[va]
+    xb, yb = VX[vb], VY[vb]
     dx, dy = xb - xa, yb - ya
     length = np.sqrt(dx**2 + dy**2)
     return float(dy / length), float(-dx / length)

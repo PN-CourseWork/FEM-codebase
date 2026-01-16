@@ -58,7 +58,7 @@ print(f"\n  Max error E = {E1:.6e}")
 
 # Triplot for Case 1
 fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-tri = Triangulation(mesh1.VX, mesh1.VY, mesh1.EToV - 1)
+tri = Triangulation(mesh1.VX, mesh1.VY, mesh1.EToV)
 
 c0 = axes[0].tripcolor(tri, u_h1)
 axes[0].set_title(r"FEM Solution $u_h$")
@@ -178,7 +178,7 @@ plt.close(fig)
 
 # Triplot for Case 2
 fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-tri = Triangulation(mesh2.VX, mesh2.VY, mesh2.EToV - 1)
+tri = Triangulation(mesh2.VX, mesh2.VY, mesh2.EToV)
 
 c0 = axes[0].tripcolor(tri, u_h2)
 axes[0].set_title(r"FEM Solution $u_h$")
