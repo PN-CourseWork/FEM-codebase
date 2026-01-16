@@ -1,0 +1,46 @@
+# Group 16 
+# What can be done to Minimize the Co2 footprint? 
+
+Currently there is not much left off substantial impact in the code to optimize. Using CProfiler it is observed the main bottleneck is directly solving the linear system accounting for around 60% of runtime and around 30% for the matrix assembly and conversion since it is assembled in coo format (to simplify the code) and then converted to csr before solving. 
+
+However, with increasingly larger problems, the following would make sense to address: 
+
+1. Solver the system with an iterative solver instead of direct: combined with an efficient preconditioner. 
+2. Assemble the matrix in parallel
+3. Assemble directly in csr
+3. Make use of efficient datastructures for bookkeeping while considering how to improve cache locality -> would result in faster matrix assemblies/BC modifications. 
+
+# 2. 
+
+# 3. DOF: 2091 
+
+# 4. Hardware 
+- Macbook pro m3 pro 
+
+# 5. CO2 consumption estimate 
+b) 2.0876e-08 kg
+c) 1.8648e-08 kg
+
+# 6. Max Error: 
+  ┌───────────────────────┬──────────┬───────────┐
+  │       Exercise        │ Diagonal │ Max Error │
+  ├───────────────────────┼──────────┼───────────┤
+  │ 2.8b (quarter domain) │ nw_se    │ 5.36e-03  │
+  ├───────────────────────┼──────────┼───────────┤
+  │ 2.8b (quarter domain) │ sw_ne    │ 1.27e-03  │
+  ├───────────────────────┼──────────┼───────────┤
+  │ 2.8c (full domain)    │ nw_se    │ 9.95e-03  │
+  ├───────────────────────┼──────────┼───────────┤
+  │ 2.8c (full domain)    │ sw_ne    │ 9.95e-03  │
+  └───────────────────────┴──────────┴───────────┘
+With the different ways to define the elements in the mesh as: 
+
+nw_se (northwest-southeast):     sw_ne (southwest-northeast):
+  ┌─────┐                          ┌─────┐
+  │ ╲   │                          │   ╱ │
+  │   ╲ │                          │ ╱   │
+  └─────┘                          └─────┘
+
+
+
+

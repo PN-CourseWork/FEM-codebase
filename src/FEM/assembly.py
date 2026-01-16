@@ -62,8 +62,6 @@ def assembly_2d(
     # abc[:, i, 1] = b_i, abc[:, i, 2] = c_i
     b1, b2, b3 = mesh.abc[:, 0, 1], mesh.abc[:, 1, 1], mesh.abc[:, 2, 1]
     c1, c2, c3 = mesh.abc[:, 0, 2], mesh.abc[:, 1, 2], mesh.abc[:, 2, 2]
-
-    # Reuse precomputed delta from mesh
     inv_4delta = 1.0 / (4.0 * mesh.delta)
 
     # Compute local stiffness entries
@@ -71,13 +69,12 @@ def assembly_2d(
         b1, b2, b3, c1, c2, c3, inv_4delta, lam1, lam2
     )
 
-    # Preallocate COO arrays 
+    # Build COO arrays
     nnz = 9 * noelms
     row_indices = np.empty(nnz, dtype=np.int64)
     col_indices = np.empty(nnz, dtype=np.int64)
     data = np.empty(nnz, dtype=np.float64)
 
-    # Fill row indices: 
     row_indices[0::9] = v1
     row_indices[1::9] = v1
     row_indices[2::9] = v1
@@ -88,7 +85,6 @@ def assembly_2d(
     row_indices[7::9] = v3
     row_indices[8::9] = v3
 
-    # Fill col indices: 
     col_indices[0::9] = v1
     col_indices[1::9] = v2
     col_indices[2::9] = v3
@@ -99,15 +95,14 @@ def assembly_2d(
     col_indices[7::9] = v2
     col_indices[8::9] = v3
 
-    # Fill data: 
     data[0::9] = K11
     data[1::9] = K12
     data[2::9] = K13
-    data[3::9] = K12  
+    data[3::9] = K12
     data[4::9] = K22
     data[5::9] = K23
-    data[6::9] = K13  
-    data[7::9] = K23  
+    data[6::9] = K13
+    data[7::9] = K23
     data[8::9] = K33
 
     # Create CSR matrix directly from COO-style input

@@ -185,7 +185,7 @@ class Mesh2d:
 
         self.delta = 0.5 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
 
-        # Pre-allocate abc array 
+        # Pre-allocate abc array
         # Shape: (noelms, 3 basis functions, 3 coefficients [a, b, c])
         self.abc = np.empty((self.noelms, 3, 3), dtype=np.float64)
         # Basis function 1: a1, b1, c1
