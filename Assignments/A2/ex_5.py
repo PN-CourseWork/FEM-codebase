@@ -12,7 +12,7 @@ from FEM.datastructures import Mesh2d
 from FEM.assembly import assembly_2d
 from FEM.boundary import get_boundary_nodes, dirbc_2d
 
-np.set_printoptions(precision=6, suppress=True, linewidth=160)
+#np.set_printoptions(precision=6, suppress=True, linewidth=160)
 # Use custom style
 plt.style.use("src/FEM/fem.mplstyle")
 
