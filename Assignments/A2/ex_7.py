@@ -1,8 +1,5 @@
 """
-Exercise 2.7: Mixed Boundary Conditions
-
-Demonstrates solving with Neumann BCs on left/bottom and Dirichlet on right/top.
-"""
+Exercise 2.7"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,9 +23,9 @@ x0, y0 = -2.5, -4.8
 L1, L2 = 7.6, 5.9
 
 # ============================================================
-# TEST CASE 1: u(x,y) = 3x + 5y - 7 (linear, should be exact)
+# TEST CASE 1: u(x,y) = 3x + 5y - 7 
 # ============================================================
-print("\nCASE 1: u(x,y) = 3x + 5y - 7")
+print("\nCASE 1")
 print("-" * 50)
 
 
@@ -84,7 +81,7 @@ for diag in ["nw_se", "sw_ne"]:
     plt.close(fig)
 
 # ============================================================
-# TEST CASE 2: u(x,y) = sin(x)sin(y) - Compare both diagonal types
+# TEST CASE 2: u(x,y) = sin(x)sin(y) 
 # ============================================================
 print("\n\nCASE 2: u(x,y) = sin(x)sin(y)")
 print("-" * 50)
@@ -107,12 +104,12 @@ def q_bottom_2(x, y):
 
 
 # ============================================================
-# CONVERGENCE ANALYSIS - Both diagonal types
+# CONVERGENCE ANALYSIS 
 # ============================================================
 print("\n\nCONVERGENCE ANALYSIS")
 print("-" * 50)
 
-p_values = range(3, 9)  # Extended range for better rate calculation
+p_values = range(3, 9)  
 diagonals = ["nw_se", "sw_ne"]
 results = {}
 
