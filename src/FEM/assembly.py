@@ -42,13 +42,6 @@ def _p1_local_load(
     delta: NDArray[np.float64],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """Compute P1 load vector contributions per element.
-
-    Uses average value approximation (MATLAB convention):
-        q_avg = (q_v1 + q_v2 + q_v3) / 3
-        contrib_r = q_avg * delta / 3 = delta/9 * (q_v1 + q_v2 + q_v3)
-
-    Returns:
-        Tuple of (contrib_v1, contrib_v2, contrib_v3) contributions for each vertex.
     """
     # Same contribution for all three nodes (average value approximation)
     contrib = delta / 9 * (qt_v1 + qt_v2 + qt_v3)
@@ -62,20 +55,10 @@ def assembly_2d(
     lam2: float = 1.0,
 ) -> tuple[csr_matrix, NDArray[np.float64]]:
     """Assemble global stiffness matrix A and load vector b.
-
-    Args:
-        mesh: The 2D triangular mesh.
-        qt: Source term evaluated at mesh nodes.
-        lam1: Diffusion coefficient in x-direction (default: 1.0).
-        lam2: Diffusion coefficient in y-direction (default: 1.0).
-
-    Returns:
-        Tuple of (A, b) where A is the stiffness matrix and b is the load vector.
     """
     v1, v2, v3 = mesh._v1, mesh._v2, mesh._v3
     noelms = mesh.noelms
 
-    # Use precomputed basis function coefficients from mesh
     # abc[:, i, 1] = b_i, abc[:, i, 2] = c_i
     b1, b2, b3 = mesh.abc[:, 0, 1], mesh.abc[:, 1, 1], mesh.abc[:, 2, 1]
     c1, c2, c3 = mesh.abc[:, 0, 2], mesh.abc[:, 1, 2], mesh.abc[:, 2, 2]
@@ -88,13 +71,13 @@ def assembly_2d(
         b1, b2, b3, c1, c2, c3, inv_4delta, lam1, lam2
     )
 
-    # Preallocate COO arrays (9 entries per element for 3x3 local matrix)
+    # Preallocate COO arrays 
     nnz = 9 * noelms
     row_indices = np.empty(nnz, dtype=np.int64)
     col_indices = np.empty(nnz, dtype=np.int64)
     data = np.empty(nnz, dtype=np.float64)
 
-    # Fill row indices: [v1, v1, v1, v2, v2, v2, v3, v3, v3] pattern
+    # Fill row indices: 
     row_indices[0::9] = v1
     row_indices[1::9] = v1
     row_indices[2::9] = v1
@@ -105,7 +88,7 @@ def assembly_2d(
     row_indices[7::9] = v3
     row_indices[8::9] = v3
 
-    # Fill col indices: [v1, v2, v3, v1, v2, v3, v1, v2, v3] pattern
+    # Fill col indices: 
     col_indices[0::9] = v1
     col_indices[1::9] = v2
     col_indices[2::9] = v3
@@ -116,7 +99,7 @@ def assembly_2d(
     col_indices[7::9] = v2
     col_indices[8::9] = v3
 
-    # Fill data: local stiffness entries (symmetric matrix)
+    # Fill data: 
     data[0::9] = K11
     data[1::9] = K12
     data[2::9] = K13
@@ -127,16 +110,16 @@ def assembly_2d(
     data[7::9] = K23  # K32 = K23
     data[8::9] = K33
 
-    # Create COO matrix and convert to CSR (handles duplicate entries automatically)
+    # Create COO matrix and convert to CSR 
     A = csr_matrix(coo_matrix(
         (data, (row_indices, col_indices)),
         shape=(mesh.nonodes, mesh.nonodes),
     ))
 
-    # Compute local load contributions (different for each vertex)
+    # Compute local load contributions 
     contrib_v1, contrib_v2, contrib_v3 = _p1_local_load(qt[v1], qt[v2], qt[v3], mesh.delta)
 
-    # Assemble global load vector using bincount with preallocated arrays
+    # Assemble global load vector 
     all_nodes = np.empty(3 * noelms, dtype=np.int64)
     all_nodes[0::3] = v1
     all_nodes[1::3] = v2
