@@ -90,8 +90,9 @@ for diag in diagonals:
         u_ex = u_exact(mesh.VX, mesh.VY)
         E_inf = np.max(np.abs(u_h - u_ex))
 
-        # u(0,0) is at index 0 for quarter domain starting at origin
-        u_00 = u_h[0]
+        # u(0,0) is at bottom of first column (y goes top-to-bottom in mesh)
+        idx_00 = mesh.noelms2  # = nonodes2 - 1 for bottom-left corner
+        u_00 = u_h[idx_00]
 
         errors_b.append(E_inf)
         dofs_b.append(n_dofs)
