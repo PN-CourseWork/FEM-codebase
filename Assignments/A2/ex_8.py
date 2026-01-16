@@ -1,7 +1,5 @@
 """
-Exercise 2.8: Exploiting Symmetry with Neumann BCs
-
-Compares quarter domain (mixed BC) vs full domain (Dirichlet) approaches.
+Exercise 2.8
 """
 
 import time
@@ -15,6 +13,7 @@ from scipy.interpolate import LinearNDInterpolator
 from FEM.datastructures import Mesh2d
 from FEM.solvers import solve_mixed_bc_2d, solve_dirichlet_bc_2d
 
+np.set_printoptions(precision=6, suppress=True, linewidth=160)
 # Use custom style
 plt.style.use("src/FEM/fem.mplstyle")
 
@@ -36,11 +35,11 @@ def q_tilde(x, y):
 
 
 def q_left(x, _y):
-    return np.zeros_like(x)  # Homogeneous Neumann (symmetry)
+    return np.zeros_like(x)  
 
 
 def q_bottom(x, _y):
-    return np.zeros_like(x)  # Homogeneous Neumann (symmetry)
+    return np.zeros_like(x) 
 
 
 # ============================================================
@@ -302,5 +301,3 @@ for diag in diagonals:
     fig2.savefig(output_dir / f"error_triplot_{diag}.pdf")
     plt.close(fig2)
 
-print(f"\n  Plots saved to: {output_dir}")
-print("\nAll tests completed!")
