@@ -74,7 +74,7 @@ def main():
     def q_2(x, y):
         return -2 * (x**2 + y**2)
 
-    p_values = range(4, 8)
+    p_values = range(1, 7)
     errors = []
     h_values = []
 
@@ -127,8 +127,6 @@ def main():
     print("-" * 50)
 
     # Domain [0, pi] x [0, pi] for nice boundary conditions (u=0 on boundary)
-    x0_mms, y0_mms = 0.0, 0.0
-    L1_mms, L2_mms = np.pi, np.pi
 
     def u_exact_mms(x, y):
         return np.sin(x) * np.sin(y)
@@ -144,8 +142,8 @@ def main():
 
     for p in p_values:
         noelms = 2**p
-        mesh = Mesh2d(x0=x0_mms, y0=y0_mms, L1=L1_mms, L2=L2_mms, noelms1=noelms, noelms2=noelms)
-        h = np.sqrt((L1_mms / noelms) ** 2 + (L2_mms / noelms) ** 2)
+        mesh = Mesh2d(x0=x0, y0=y0, L1=L1, L2=L2, noelms1=noelms, noelms2=noelms)
+        h = np.sqrt((L1 / noelms) ** 2 + (L2 / noelms) ** 2)
 
         qt = q_mms(mesh.VX, mesh.VY)
         A, b = assembly_2d(mesh, qt)

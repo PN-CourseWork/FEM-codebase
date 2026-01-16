@@ -111,7 +111,7 @@ def main():
     #TODO: ex 2.7: ote that un = −ux on the left edge of the boundary and un = −uy on the bottom edge.
 
     #TODO: Is there a mistake in the implementation since we don't get 2.0 convergence???? 
-    p_values = range(5, 8)
+    p_values = range(7, 10)
     errors = []
     errors_l2 = []
     h_values = []
