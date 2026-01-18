@@ -18,5 +18,5 @@ pip install -r requirements.txt  # Installs all dependencies + the FEM package
 
 ```bash
 source .venv/bin/activate  # Activate virtual environment
-python DriverSustainabilityBenchmarkingWeek1.py
+python DriverSustainabilityBenchmarkingWeek2.py
 ```
