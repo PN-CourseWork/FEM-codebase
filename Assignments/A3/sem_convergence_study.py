@@ -1,4 +1,4 @@
-"""SEM Convergence Study: h-convergence and p-convergence."""
+"""SEM Convergence Study using Method of Manufactured Solutions (MMS)."""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,23 +13,36 @@ from FEM.SEM import (
     linf_error_sem,
 )
 
-# Output directory
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "figures" / "A3"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Manufactured solution: u = sin(πx)sin(πy)
-u_exact = lambda x, y: np.sin(np.pi * x) * np.sin(np.pi * y)
-f_rhs = lambda x, y: 2 * np.pi**2 * np.sin(np.pi * x) * np.sin(np.pi * y)
-bc_func = lambda x, y: np.zeros_like(x)
+# =============================================================================
+# MMS: Manufactured solution with non-homogeneous Dirichlet BCs
+#   u(x,y) = exp(x) * sin(πy) + x²y(1-y)
+#
+# Laplacian:
+#   ∂²u/∂x² = exp(x)sin(πy) + 2y(1-y)
+#   ∂²u/∂y² = -π²exp(x)sin(πy) + x²(-2)
+#   -∇²u = (π²-1)exp(x)sin(πy) - 2y(1-y) + 2x²
+# =============================================================================
+def u_exact(x, y):
+    return np.exp(x) * np.sin(np.pi * y) + x**2 * y * (1 - y)
+
+def f_rhs(x, y):
+    return (np.pi**2 - 1) * np.exp(x) * np.sin(np.pi * y) - 2*y*(1-y) + 2*x**2
+
+def bc_func(x, y):
+    return u_exact(x, y)
 
 print("=" * 60)
-print("SEM CONVERGENCE STUDY")
+print("SEM CONVERGENCE STUDY (MMS)")
 print("=" * 60)
+print("u(x,y) = exp(x)sin(πy) + x²y(1-y)")
 
 # =============================================================================
-# H-CONVERGENCE STUDY
+# H-CONVERGENCE
 # =============================================================================
-print("\nH-CONVERGENCE STUDY")
+print("\nH-CONVERGENCE")
 print("-" * 60)
 
 p_values = [2, 3, 4, 5, 6]
@@ -41,7 +54,7 @@ for p in p_values:
     print(f"  {'n':<4} {'h':<8} {'DOF':<6} {'L2':<12} {'Linf':<12}")
     print(f"  {'-'*50}")
 
-    h_results[p] = {'n': [], 'h': [], 'dof': [], 'l2': [], 'linf': []}
+    h_results[p] = {'h': [], 'dof': [], 'l2': [], 'linf': []}
 
     for n in n_values:
         with tempfile.NamedTemporaryFile(suffix='.msh', delete=False) as f:
@@ -55,7 +68,6 @@ for p in p_values:
         linf_err = linf_error_sem(mesh, u, u_exact)
         h = 1.0 / n
 
-        h_results[p]['n'].append(n)
         h_results[p]['h'].append(h)
         h_results[p]['dof'].append(mesh.nonodes)
         h_results[p]['l2'].append(l2_err)
@@ -65,10 +77,10 @@ for p in p_values:
         filepath.unlink()
 
 # =============================================================================
-# P-CONVERGENCE STUDY
+# P-CONVERGENCE
 # =============================================================================
 print("\n" + "=" * 60)
-print("P-CONVERGENCE STUDY")
+print("P-CONVERGENCE")
 print("-" * 60)
 
 n_fixed = [2, 4, 8]
@@ -108,35 +120,33 @@ print("\n" + "=" * 60)
 print("GENERATING PLOTS")
 print("-" * 60)
 
+cmap_h = plt.get_cmap('viridis')
+cmap_p = plt.get_cmap('plasma')
+markers = ['o', 's', '^', 'D', 'v']
+
 # H-convergence plot
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(p_values)))
-markers = ['o', 's', '^', 'D', 'v']
+colors = [cmap_h(x) for x in np.linspace(0.2, 0.8, len(p_values))]
 
 for idx, p in enumerate(p_values):
     h = np.array(h_results[p]['h'])
     l2 = np.array(h_results[p]['l2'])
     linf = np.array(h_results[p]['linf'])
-
-    # Compute rate from linear regression
     rate = np.polyfit(np.log(h), np.log(l2), 1)[0]
 
     ax1.loglog(h, l2, f'{markers[idx]}-', color=colors[idx],
                label=f'p={p} (rate={rate:.1f})', markersize=8)
-    ax2.loglog(h, linf, f'{markers[idx]}-', color=colors[idx],
-               label=f'p={p}', markersize=8)
+    ax2.loglog(h, linf, f'{markers[idx]}-', color=colors[idx], label=f'p={p}', markersize=8)
 
-# Reference slopes
 h_ref = np.array([0.5, 0.05])
 for slope, ls in [(2, ':'), (4, '--'), (6, '-.')]:
     ax1.loglog(h_ref, 0.5 * h_ref**slope, ls, color='gray', alpha=0.5, label=f'O(h^{slope})')
 
 ax1.set(xlabel='h', ylabel='L² error', title='L² Error (h-convergence)')
 ax2.set(xlabel='h', ylabel='L∞ error', title='L∞ Error (h-convergence)')
-ax1.legend(fontsize=8)
-ax2.legend(fontsize=8)
-ax1.grid(True, alpha=0.3)
-ax2.grid(True, alpha=0.3)
+for ax in (ax1, ax2):
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
 fig.tight_layout()
 fig.savefig(OUTPUT_DIR / "h_convergence.pdf")
 plt.close(fig)
@@ -144,32 +154,29 @@ print(f"Saved: {OUTPUT_DIR / 'h_convergence.pdf'}")
 
 # P-convergence plot
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-colors = plt.cm.plasma(np.linspace(0.2, 0.8, len(n_fixed)))
+colors = [cmap_p(x) for x in np.linspace(0.2, 0.8, len(n_fixed))]
 
 for idx, n in enumerate(n_fixed):
-    p = np.array(p_results[n]['p'])
+    p_arr = np.array(p_results[n]['p'])
     l2 = np.array(p_results[n]['l2'])
     linf = np.array(p_results[n]['linf'])
 
-    ax1.semilogy(p, l2, f'{markers[idx]}-', color=colors[idx],
-                 label=f'{n}x{n} mesh', markersize=8)
-    ax2.semilogy(p, linf, f'{markers[idx]}-', color=colors[idx],
-                 label=f'{n}x{n} mesh', markersize=8)
+    ax1.semilogy(p_arr, l2, f'{markers[idx]}-', color=colors[idx], label=f'{n}x{n}', markersize=8)
+    ax2.semilogy(p_arr, linf, f'{markers[idx]}-', color=colors[idx], label=f'{n}x{n}', markersize=8)
 
 ax1.set(xlabel='p', ylabel='L² error', title='L² Error (p-convergence)')
 ax2.set(xlabel='p', ylabel='L∞ error', title='L∞ Error (p-convergence)')
-ax1.legend()
-ax2.legend()
-ax1.grid(True, alpha=0.3)
-ax2.grid(True, alpha=0.3)
+for ax in (ax1, ax2):
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 fig.tight_layout()
 fig.savefig(OUTPUT_DIR / "p_convergence.pdf")
 plt.close(fig)
 print(f"Saved: {OUTPUT_DIR / 'p_convergence.pdf'}")
 
-# Error vs DOF plot
+# Error vs DOF
 fig, ax = plt.subplots(figsize=(8, 6))
-colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(p_values)))
+colors = [cmap_h(x) for x in np.linspace(0.2, 0.8, len(p_values))]
 
 for idx, p in enumerate(p_values):
     dof = np.array(h_results[p]['dof'])
@@ -184,6 +191,4 @@ fig.savefig(OUTPUT_DIR / "error_vs_dof.pdf")
 plt.close(fig)
 print(f"Saved: {OUTPUT_DIR / 'error_vs_dof.pdf'}")
 
-print("\n" + "=" * 60)
-print("DONE")
-print("=" * 60)
+print("\nDONE")
