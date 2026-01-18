@@ -1,16 +1,3 @@
-"""Spectral Element Method Convergence Study.
-
-This script demonstrates the h-convergence and p-convergence properties
-of the Spectral Element Method for solving the Poisson equation:
-
-    -∇²u = f  on Ω = [0,1]²
-    u = g     on ∂Ω
-
-Using manufactured solution: u = sin(πx)sin(πy)
-
-Run with: uv run python assignments/A3/sem_convergence_study.py
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -44,20 +31,7 @@ def bc_func(x, y):
 
 
 def run_h_convergence(p_values, n_values):
-    """Run h-convergence study for multiple polynomial orders.
 
-    Parameters
-    ----------
-    p_values : list[int]
-        Polynomial orders to test
-    n_values : list[int]
-        Number of elements per direction
-
-    Returns
-    -------
-    dict
-        Results keyed by p, each containing h, l2_error, linf_error, dof
-    """
     results = {}
 
     for p in p_values:
@@ -106,20 +80,7 @@ def run_h_convergence(p_values, n_values):
 
 
 def run_p_convergence(n_values, p_values):
-    """Run p-convergence study for multiple mesh sizes.
 
-    Parameters
-    ----------
-    n_values : list[int]
-        Number of elements per direction (fixed mesh)
-    p_values : list[int]
-        Polynomial orders to test
-
-    Returns
-    -------
-    dict
-        Results keyed by n, each containing p, l2_error, linf_error, dof
-    """
     results = {}
 
     for n in n_values:
@@ -164,7 +125,6 @@ def run_p_convergence(n_values, p_values):
 
 
 def compute_convergence_rate(h, error):
-    """Compute convergence rate from log-log slope."""
     if len(h) < 2:
         return np.nan
     log_h = np.log(h)
@@ -175,7 +135,6 @@ def compute_convergence_rate(h, error):
 
 
 def plot_h_convergence(results, filename="h_convergence.pdf"):
-    """Plot h-convergence for different polynomial orders."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
     colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(results)))
