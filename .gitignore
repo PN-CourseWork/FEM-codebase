@@ -12,6 +12,10 @@ mlruns/
 mlflow_ui.log
 multirun/
 
+# mesh
+*.msh
+*.vtk
+
 # Uv stuff 
 uv.lock
 
