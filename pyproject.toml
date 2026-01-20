@@ -27,6 +27,9 @@ dependencies = [
   "line-profiler>=5.0.0",
   "ipykernel>=7.1.0",
   "pyarrow>=22.0.0",
+  "gmsh>=4.15.0",
+  "meshio>=5.3.5",
+  "pyvista>=0.46.5",
 ]
 
 [tool.setuptools]
